@@ -16,7 +16,7 @@ CORS(app)
 # =====================
 # LOAD MODELS
 # =====================
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+MODELS_DIR = os.path.join(os.path.dirname(__file__), "saved_models")
 
 
 def load_model(filename):
@@ -277,6 +277,31 @@ def predict_poi():
 
         prediction = float(poi_model.predict(features)[0])
         return jsonify({"poi_score_tomorrow": round(prediction, 2)})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/predict/poi-actual", methods=["POST"])
+def predict_poi_actual():
+    """Predict POI actual score from sub-metric scores."""
+    try:
+        data = request.get_json()
+        if not poi_actual_model:
+            return jsonify({"error": "POI Actual model not loaded"}), 503
+
+        import pandas as pd
+        features = pd.DataFrame([{
+            "label_score": data.get("label_score", 75),
+            "pick_score": data.get("pick_score", 75),
+            "pack_score": data.get("pack_score", 75),
+            "wpt_score_actual": data.get("wpt_score_actual", 75),
+            "tt_score": data.get("tt_score", 75),
+        }])
+
+        prediction = float(poi_actual_model.predict(features)[0])
+        return jsonify({"poi_actual_score": round(prediction, 2)})
 
     except Exception as e:
         traceback.print_exc()
