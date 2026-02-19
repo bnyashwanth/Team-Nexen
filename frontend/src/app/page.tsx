@@ -32,20 +32,20 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking authentication...</p>
+          <p className="text-body" style={{ color: 'var(--text-secondary)' }}>Checking authentication...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Supply Chain Metric Tree</h1>
-        <p className="text-gray-600 mb-8">Loading your dashboard...</p>
+        <h1 className="text-headline mb-4" style={{ color: 'var(--text-primary)' }}>Supply Chain Metric Tree</h1>
+        <p className="text-body mb-8" style={{ color: 'var(--text-secondary)' }}>Loading your dashboard...</p>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
       </div>
     </div>

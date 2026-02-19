@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import MetricTree from '@/components/MetricTree'
 import TrendChart from '@/components/TrendChart'
 import AICopilotSidebar from '@/components/AICopilotSidebar'
+import LogicAssistantWidget from '@/components/LogicAssistantWidget'
+import Logo from '@/components/Logo'
 import { apiClient, type User, type Warehouse, type MetricSnapshot } from '@/lib/api'
 import { useNotifications } from '@/components/NotificationSystem'
 
@@ -15,85 +17,170 @@ type ActiveView = 'home' | 'metric-tree' | 'alerts' | 'charts' | 'data-table'
 
 interface Alert {
   id: string
-  metric: string
-  warehouse: string
-  severity: 'critical' | 'warn' | 'healthy'
-  score: number
-  message: string
-  timestamp: string
+  title: string
+  description: string
+  status: 'critical' | 'warn' | 'healthy'
+  action?: string
+  timestamp: Date
 }
 
 // ═══════════════════════════════════
-// Sidebar Component
+// SVG Icon Components
+// ═══════════════════════════════════
+const icons = {
+  home: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  ),
+  tree: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" />
+      <path d="M13 6h3a2 2 0 012 2v7" /><line x1="6" y1="9" x2="6" y2="21" />
+    </svg>
+  ),
+  alert: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 01-3.46 0" />
+    </svg>
+  ),
+  chart: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  table: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  ),
+  settings: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  ),
+  menu: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  ),
+  logout: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
+  download: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  ),
+  sync: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+    </svg>
+  ),
+  back: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
+    </svg>
+  ),
+}
+
+// ═══════════════════════════════════
+// Sidebar Component (Dark)
 // ═══════════════════════════════════
 function Sidebar({
-  collapsed,
-  onToggle,
-  user,
-  warehouses,
-  selectedWarehouse,
-  onWarehouseChange,
-  onLogout,
-  activeView,
-  onNavigate,
+  collapsed, onToggle, user, warehouses, selectedWarehouse,
+  onWarehouseChange, onLogout, activeView, onNavigate,
 }: {
-  collapsed: boolean
-  onToggle: () => void
-  user: User | null
-  warehouses: Warehouse[]
-  selectedWarehouse: string
-  onWarehouseChange: (id: string) => void
-  onLogout: () => void
-  activeView: ActiveView
-  onNavigate: (view: ActiveView) => void
+  collapsed: boolean; onToggle: () => void; user: User | null
+  warehouses: Warehouse[]; selectedWarehouse: string
+  onWarehouseChange: (id: string) => void; onLogout: () => void
+  activeView: ActiveView; onNavigate: (view: ActiveView) => void
 }) {
+  const navItems: { view: ActiveView; icon: React.ReactNode; label: string }[] = [
+    { view: 'home', icon: icons.home, label: 'Dashboard' },
+    { view: 'metric-tree', icon: icons.tree, label: 'Metric Tree' },
+    { view: 'alerts', icon: icons.alert, label: 'Alerts' },
+    { view: 'charts', icon: icons.chart, label: 'Charts' },
+    { view: 'data-table', icon: icons.table, label: 'Data Table' },
+  ]
+
   return (
-    <aside
-      className={`fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-in-out
-                ${collapsed ? 'w-[68px]' : 'w-[280px]'}
-                bg-white border-r border-slate-200 shadow-sm flex flex-col`}
-    >
-      {/* Top: Logo + Hamburger */}
-      <div className="flex items-center h-16 px-4 border-b border-slate-100">
-        <button
-          onClick={onToggle}
-          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-600">
-            <path d="M3 12h18M3 6h18M3 18h18" />
-          </svg>
+    <aside className={`fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-in-out glass-sidebar flex flex-col
+      ${collapsed ? 'w-17' : 'w-65'}`}>
+
+      {/* Logo + Toggle */}
+      <div className="flex items-center h-16 px-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <button onClick={onToggle}
+          className="w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-200 hover:bg-white/5"
+          style={{ color: 'var(--text-secondary)' }}>
+          {icons.menu}
         </button>
         {!collapsed && (
-          <span className="ml-3 text-lg font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            ShopSwift
-          </span>
+          <div className="flex items-center gap-2">
+            <Logo size="sm" className="shrink-0" />
+            <span className="text-lg font-bold gradient-text tracking-tight">Nexen</span>
+          </div>
         )}
       </div>
 
-      {/* Navigation */}
+      {/* Nav */}
       <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
-        <NavItem collapsed={collapsed} icon="🏠" label="Dashboard" active={activeView === 'home'} onClick={() => onNavigate('home')} />
-        <NavItem collapsed={collapsed} icon="🌳" label="Metric Tree" active={activeView === 'metric-tree'} onClick={() => onNavigate('metric-tree')} />
-        <NavItem collapsed={collapsed} icon="🔔" label="Alerts" active={activeView === 'alerts'} onClick={() => onNavigate('alerts')} />
-        <NavItem collapsed={collapsed} icon="📊" label="Charts" active={activeView === 'charts'} onClick={() => onNavigate('charts')} />
-        <NavItem collapsed={collapsed} icon="📋" label="Data Table" active={activeView === 'data-table'} onClick={() => onNavigate('data-table')} />
+        {navItems.map((item) => (
+          <button key={item.view} onClick={() => onNavigate(item.view)}
+            className={`w-full flex items-center gap-3 rounded-xl transition-all duration-200
+              ${collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5'}
+              ${activeView === item.view
+                ? 'text-indigo-400 font-medium'
+                : 'hover:bg-white/5'}`}
+            style={{
+              background: activeView === item.view ? 'rgba(99, 102, 241, 0.1)' : undefined,
+              color: activeView === item.view ? '#818cf8' : 'var(--text-secondary)',
+              ...(activeView === item.view ? { boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.15)' } : {}),
+            }}
+            title={collapsed ? item.label : undefined}>
+            <span className="shrink-0">{item.icon}</span>
+            {!collapsed && <span className="text-sm">{item.label}</span>}
+          </button>
+        ))}
 
-        {!collapsed && <div className="h-px bg-slate-100 my-3" />}
+        {!collapsed && <div className="h-px my-3" style={{ background: 'var(--border-subtle)' }} />}
 
-        <NavItem collapsed={collapsed} icon="⚙️" label="Admin Portal" active={false} onClick={() => window.location.href = '/admin'} />
+        <button onClick={() => window.location.href = '/admin'}
+          className={`w-full flex items-center gap-3 rounded-xl transition-all duration-200 hover:bg-white/5
+            ${collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5'}`}
+          style={{ color: 'var(--text-muted)' }}
+          title={collapsed ? 'Admin Portal' : undefined}>
+          <span className="shrink-0">{icons.settings}</span>
+          {!collapsed && <span className="text-sm">Admin Portal</span>}
+        </button>
       </nav>
 
       {/* Warehouse Selector */}
       {!collapsed && warehouses.length > 0 && (
-        <div className="px-4 py-3 border-t border-slate-100">
-          <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Warehouse</label>
+        <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <label className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Warehouse
+          </label>
           <select
             value={selectedWarehouse}
             onChange={(e) => onWarehouseChange(e.target.value)}
-            className="mt-1 w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition"
-          >
+            className="mt-1.5 w-full text-sm rounded-lg px-3 py-2 transition-all outline-none"
+            style={{
+              background: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid var(--border-medium)',
+              color: 'var(--text-primary)',
+            }}>
             {warehouses.map((w) => (
-              <option key={w.id || w._id} value={w.id || w._id}>
+              <option key={w.id || w._id} value={w.id || w._id} style={{ background: '#1e293b' }}>
                 {w.name} ({w.zone})
               </option>
             ))}
@@ -101,29 +188,29 @@ function Sidebar({
         </div>
       )}
 
-      {/* Profile Section */}
-      <div className={`border-t border-slate-100 p-3 ${collapsed ? 'flex justify-center' : ''}`}>
+      {/* Profile */}
+      <div className={`p-3 ${collapsed ? 'flex justify-center' : ''}`}
+        style={{ borderTop: '1px solid var(--border-subtle)' }}>
         {collapsed ? (
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
               {user?.name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 truncate">{user?.name || 'User'}</p>
-              <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{user?.name || 'User'}</p>
+              <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{user?.email}</p>
             </div>
-            <button
-              onClick={onLogout}
-              className="text-slate-400 hover:text-red-500 transition-colors p-1"
-              title="Logout"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
+            <button onClick={onLogout}
+              className="p-1.5 rounded-lg transition-all hover:bg-red-500/10"
+              style={{ color: 'var(--text-muted)' }}
+              title="Logout">
+              {icons.logout}
             </button>
           </div>
         )}
@@ -132,105 +219,171 @@ function Sidebar({
   )
 }
 
-function NavItem({ collapsed, icon, label, active, onClick }: {
-  collapsed: boolean; icon: string; label: string; active: boolean; onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 rounded-xl transition-all duration-200
-                ${collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5'}
-                ${active
-          ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm'
-          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-        }`}
-      title={collapsed ? label : undefined}
-    >
-      <span className="text-lg flex-shrink-0">{icon}</span>
-      {!collapsed && <span className="text-sm">{label}</span>}
-    </button>
-  )
-}
-
 // ═══════════════════════════════════
-// Dashboard Cards
+// Dashboard Cards (Glass)
 // ═══════════════════════════════════
-function DashboardCard({ icon, title, value, subtitle, status, color, onClick }: {
-  icon: string; title: string; value: string; subtitle: string; status?: string; color: string; onClick: () => void
+function DashboardCard({ icon, title, value, subtitle, status, color, onClick, delay }: {
+  icon: React.ReactNode; title: string; value: string; subtitle: string
+  status?: string; color: string; onClick: () => void; delay?: number
 }) {
-  const colorMap: Record<string, { bg: string; border: string; accent: string; iconBg: string }> = {
-    indigo: { bg: 'hover:border-indigo-300', border: 'border-slate-200', accent: 'text-indigo-600', iconBg: 'bg-indigo-50 text-indigo-600' },
-    emerald: { bg: 'hover:border-emerald-300', border: 'border-slate-200', accent: 'text-emerald-600', iconBg: 'bg-emerald-50 text-emerald-600' },
-    amber: { bg: 'hover:border-amber-300', border: 'border-slate-200', accent: 'text-amber-600', iconBg: 'bg-amber-50 text-amber-600' },
-    violet: { bg: 'hover:border-violet-300', border: 'border-slate-200', accent: 'text-violet-600', iconBg: 'bg-violet-50 text-violet-600' },
+  const accentMap: Record<string, { gradient: string; glow: string; text: string }> = {
+    indigo: { gradient: 'linear-gradient(135deg, #6366f1, #818cf8)', glow: 'rgba(99,102,241,0.15)', text: '#818cf8' },
+    emerald: { gradient: 'linear-gradient(135deg, #10b981, #34d399)', glow: 'rgba(16,185,129,0.15)', text: '#34d399' },
+    amber: { gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)', glow: 'rgba(245,158,11,0.15)', text: '#fbbf24' },
+    violet: { gradient: 'linear-gradient(135deg, #8b5cf6, #a78bfa)', glow: 'rgba(139,92,246,0.15)', text: '#a78bfa' },
   }
-  const c = colorMap[color] || colorMap.indigo
+  const accent = accentMap[color] || accentMap.indigo
 
   return (
     <button
       onClick={onClick}
-      className={`group relative bg-white rounded-2xl border ${c.border} ${c.bg} p-6 text-left
-                transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer w-full`}
+      className="group relative w-full p-6 text-left rounded-2xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+      style={{
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        border: '1px solid rgba(100, 116, 139, 0.1)',
+        boxShadow: '0 4px 20px rgba(100, 116, 139, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05)',
+      }}
     >
+      {/* Header */}
       <div className="flex items-start justify-between mb-4">
-        <div className={`w-12 h-12 rounded-xl ${c.iconBg} flex items-center justify-center text-2xl
-                    transition-transform duration-300 group-hover:scale-110`}>
-          {icon}
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg"
+            style={{
+              background: accent.gradient,
+              boxShadow: `0 4px 12px ${accent.glow}`,
+            }}>
+            {icon}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              {title}
+            </h3>
+          </div>
         </div>
         {status && (
-          <span className={`px-2.5 py-1 text-xs font-medium rounded-full
-                        ${status === 'healthy' ? 'bg-emerald-50 text-emerald-600' :
-              status === 'warn' ? 'bg-amber-50 text-amber-600' :
-                'bg-red-50 text-red-600'}`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+            status === 'healthy' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+            status === 'warn' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+            'bg-red-50 text-red-600 border border-red-200'
+          }`}>
             {status === 'healthy' ? 'Healthy' : status === 'warn' ? 'Warning' : 'Critical'}
           </span>
         )}
       </div>
-      <h3 className="text-sm font-medium text-slate-500 mb-1">{title}</h3>
-      <p className={`text-3xl font-bold ${c.accent} mb-1`}>{value}</p>
-      <p className="text-xs text-slate-400">{subtitle}</p>
-      <div className={`absolute bottom-0 left-0 right-0 h-1 rounded-b-2xl bg-gradient-to-r
-                ${color === 'indigo' ? 'from-indigo-400 to-indigo-600' :
-          color === 'emerald' ? 'from-emerald-400 to-emerald-600' :
-            color === 'amber' ? 'from-amber-400 to-amber-600' :
-              'from-violet-400 to-violet-600'}
-                opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+
+      {/* Content */}
+      <div className="space-y-2">
+        <p className="text-3xl font-bold" style={{ color: accent.text }}>
+          {value}
+        </p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          {subtitle}
+        </p>
+      </div>
+
+      {/* Hover Effect Overlay */}
+      <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{
+          background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.02) 0%, rgba(71, 85, 105, 0.02) 100%)',
+          border: '1px solid rgba(100, 116, 139, 0.2)',
+        }} />
+
+      {/* Bottom Accent Line */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 rounded-b-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+        style={{
+          background: accent.gradient,
+          height: '3px',
+        }} />
     </button>
   )
 }
 
 // ═══════════════════════════════════
-// Alerts View
+// Alerts View (Dark)
 // ═══════════════════════════════════
 function AlertsView({ alerts }: { alerts: Alert[] }) {
-  const severityIcon = (s: string) => s === 'critical' ? '🔴' : s === 'warn' ? '🟡' : '🟢'
   const sortedAlerts = [...alerts].sort((a, b) => {
-    const order = { critical: 0, warn: 1, healthy: 2 }
-    return (order[a.severity] || 2) - (order[b.severity] || 2)
+    const order: Record<string, number> = { critical: 0, warn: 1, healthy: 2 }
+    return (order[a.status] || 999) - (order[b.status] || 999)
   })
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {sortedAlerts.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
-          <div className="text-5xl mb-3">✅</div>
-          <p className="text-lg font-medium">All systems healthy</p>
-          <p className="text-sm">No active alerts at this time</p>
+        <div className="text-center py-12 rounded-2xl"
+          style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            border: '1px solid rgba(30, 64, 175, 0.1)',
+          }}>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center text-2xl"
+            style={{
+              background: 'linear-gradient(135deg, #10b981, #34d399)',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+            }}>
+            ✅
+          </div>
+          <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>All Systems Operational</h3>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No active alerts at this time.</p>
         </div>
       ) : (
         sortedAlerts.map((alert) => (
-          <div key={alert.id} className={`bg-white rounded-xl border p-4 flex items-start gap-4 transition-all hover:shadow-md
-                        ${alert.severity === 'critical' ? 'border-red-200' : alert.severity === 'warn' ? 'border-amber-200' : 'border-slate-200'}`}>
-            <span className="text-xl mt-0.5">{severityIcon(alert.severity)}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-semibold text-slate-800">{alert.metric.toUpperCase()}</span>
-                <span className="text-xs text-slate-400">• {alert.warehouse}</span>
+          <div
+            key={alert.id}
+            className="p-5 rounded-2xl transition-all duration-300 hover:shadow-lg border"
+            style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderColor: alert.status === 'critical' ? 'rgba(220, 38, 38, 0.2)' :
+                         alert.status === 'warn' ? 'rgba(217, 119, 6, 0.2)' :
+                         'rgba(16, 185, 129, 0.2)',
+              boxShadow: '0 2px 8px rgba(100, 116, 139, 0.05)',
+            }}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shrink-0 ${
+                alert.status === 'critical' ? 'bg-linear-to-br from-red-500 to-red-600' :
+                alert.status === 'warn' ? 'bg-linear-to-br from-amber-500 to-amber-600' :
+                'bg-linear-to-br from-emerald-500 to-emerald-600'
+              }`}>
+                {alert.status === 'critical' ? '⚠️' :
+                 alert.status === 'warn' ? '⚡' : '✓'}
               </div>
-              <p className="text-sm text-slate-600">{alert.message}</p>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-xs font-mono text-slate-400">Score: {alert.score.toFixed(1)}</span>
-                <span className="text-xs text-slate-300">{alert.timestamp}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
+                    {alert.title}
+                  </h4>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${
+                    alert.status === 'critical' ? 'bg-red-50 text-red-600 border-red-200' :
+                    alert.status === 'warn' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                    'bg-emerald-50 text-emerald-600 border-emerald-200'
+                  }`}>
+                    {alert.status.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
+                  {alert.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {alert.timestamp.toLocaleString()}
+                  </p>
+                  {alert.action && (
+                    <button className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                      style={{
+                        background: 'rgba(30, 64, 175, 0.1)',
+                        color: '#1e40af',
+                        border: '1px solid rgba(30, 64, 175, 0.2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(30, 64, 175, 0.15)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(30, 64, 175, 0.1)'
+                      }}>
+                      {alert.action}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -241,7 +394,7 @@ function AlertsView({ alerts }: { alerts: Alert[] }) {
 }
 
 // ═══════════════════════════════════
-// Charts View
+// Charts View (Dark)
 // ═══════════════════════════════════
 function ChartsView({ warehouseId }: { warehouseId: string }) {
   const metrics = ['poi', 'otd', 'wpt', 'oa', 'dfr', 'tt', 'pick', 'pack']
@@ -253,25 +406,22 @@ function ChartsView({ warehouseId }: { warehouseId: string }) {
   const [selectedMetric, setSelectedMetric] = useState('poi')
 
   return (
-    <div className="space-y-4">
-      {/* Metric Selector Chips */}
+    <div className="space-y-4 animate-fade-in">
       <div className="flex flex-wrap gap-2">
         {metrics.map((m) => (
-          <button
-            key={m}
-            onClick={() => setSelectedMetric(m)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-                            ${selectedMetric === m
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-              }`}
-          >
+          <button key={m} onClick={() => setSelectedMetric(m)}
+            className="px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200"
+            style={{
+              background: selectedMetric === m ? 'rgba(99,102,241,0.15)' : 'var(--bg-card)',
+              color: selectedMetric === m ? '#818cf8' : 'var(--text-secondary)',
+              border: `1px solid ${selectedMetric === m ? 'rgba(99,102,241,0.3)' : 'var(--border-subtle)'}`,
+              boxShadow: selectedMetric === m ? '0 0 12px rgba(99,102,241,0.1)' : 'none',
+            }}>
             {metricNames[m] || m.toUpperCase()}
           </button>
         ))}
       </div>
-      {/* Trend Chart */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="glass-card p-6">
         <TrendChart metricId={selectedMetric} warehouseId={warehouseId} days={14} />
       </div>
     </div>
@@ -279,21 +429,113 @@ function ChartsView({ warehouseId }: { warehouseId: string }) {
 }
 
 // ═══════════════════════════════════
-// Data Table View
+// Data Table View (Dark)
 // ═══════════════════════════════════
 function DataTableView({ metrics }: { metrics: MetricSnapshot[] }) {
+  const metricNames: Record<string, string> = {
+    poi: 'Perfect Order Index', otd: 'On-Time Delivery', wpt: 'Warehouse Processing',
+    oa: 'Order Accuracy', dfr: 'Damage Free Rate', tt: 'Transit Time',
+    pick: 'Picking Time', label: 'Label Generation', pack: 'Packing Speed',
+  }
+
   if (metrics.length === 0) {
     return (
-      <div className="text-center py-16 text-slate-400">
+      <div className="text-center py-16 animate-fade-in" style={{ color: 'var(--text-muted)' }}>
         <div className="text-5xl mb-3">📭</div>
-        <p className="text-lg font-medium">No data available</p>
+        <p className="text-lg font-medium" style={{ color: 'var(--text-secondary)' }}>No data available</p>
         <p className="text-sm">Select a warehouse to view metric data</p>
       </div>
     )
   }
 
-  // Extract flat metric rows from the tree
-  const rows: { metric: string; score: number; status: string; warehouse: string; timestamp: string }[] = []
+  const rows: { metric: string; score: number; status: string; timestamp: string }[] = []
+  metrics.forEach((snapshot) => {
+    if (snapshot.metricTree && typeof snapshot.metricTree === 'object') {
+      Object.entries(snapshot.metricTree).forEach(([key, val]: [string, any]) => {
+        if (val && typeof val === 'object' && 'score' in val) {
+          rows.push({
+            metric: metricNames[key] || key.toUpperCase(),
+            score: val.score ?? 0,
+            status: val.status || 'healthy',
+            timestamp: snapshot.timestamp ? new Date(snapshot.timestamp).toLocaleDateString() : '-',
+          })
+        }
+      })
+    }
+  })
+
+  return (
+    <div className="glass-card overflow-hidden animate-fade-in">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm table-dark">
+          <thead>
+            <tr>
+              <th className="text-left">Metric</th>
+              <th className="text-left">Score</th>
+              <th className="text-left">Status</th>
+              <th className="text-left">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i}>
+                <td className="font-medium" style={{ color: 'var(--text-primary)' }}>{row.metric}</td>
+                <td>
+                  <div className="flex items-center gap-3">
+                    <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-subtle)' }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(row.score, 100)}%`,
+                          background: row.score >= 80 ? '#10b981' : row.score >= 60 ? '#f59e0b' : '#ef4444',
+                        }} />
+                    </div>
+                    <span className="font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>{row.score.toFixed(1)}</span>
+                  </div>
+                </td>
+                <td>
+                  <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full uppercase tracking-wider
+                    ${row.status === 'healthy' ? 'bg-emerald-500/10 text-emerald-400' :
+                      row.status === 'warn' ? 'bg-amber-500/10 text-amber-400' :
+                        'bg-red-500/10 text-red-400'}`}>
+                    {row.status}
+                  </span>
+                </td>
+                <td style={{ color: 'var(--text-muted)' }}>{row.timestamp}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 0 && (
+        <div className="px-4 py-3 text-xs" style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+          Showing {rows.length} metrics
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════
+// Helpers
+// ═══════════════════════════════════
+function getMetricFromSnapshots(snapshots: MetricSnapshot[], metricId: string): { score: number; status: string } {
+  for (const snap of snapshots) {
+    const tree = snap.metricTree
+    if (tree && typeof tree === 'object') {
+      if (tree[metricId] && typeof tree[metricId] === 'object' && 'score' in tree[metricId]) {
+        return { score: tree[metricId].score, status: tree[metricId].status || 'healthy' }
+      }
+      if (tree.id === metricId && 'score' in tree) {
+        return { score: tree.score as number, status: (tree.status as string) || 'healthy' }
+      }
+    }
+  }
+  return { score: 0, status: 'healthy' }
+}
+
+function generateAlerts(metrics: MetricSnapshot[]): Alert[] {
+  const alerts: Alert[] = []
   const metricNames: Record<string, string> = {
     poi: 'Perfect Order Index', otd: 'On-Time Delivery', wpt: 'Warehouse Processing',
     oa: 'Order Accuracy', dfr: 'Damage Free Rate', tt: 'Transit Time',
@@ -303,69 +545,22 @@ function DataTableView({ metrics }: { metrics: MetricSnapshot[] }) {
   metrics.forEach((snapshot) => {
     if (snapshot.metricTree && typeof snapshot.metricTree === 'object') {
       Object.entries(snapshot.metricTree).forEach(([key, val]: [string, any]) => {
-        if (val && typeof val === 'object' && 'score' in val) {
-          rows.push({
-            metric: metricNames[key] || key.toUpperCase(),
-            score: val.score ?? 0,
-            status: val.status || 'healthy',
-            warehouse: snapshot.warehouseId,
-            timestamp: snapshot.timestamp ? new Date(snapshot.timestamp).toLocaleDateString() : '-',
+        if (val && typeof val === 'object' && val.status && val.status !== 'healthy') {
+          alerts.push({
+            id: `${snapshot.warehouseId}-${key}`,
+            status: val.status as 'critical' | 'warn',
+            title: metricNames[key] || key,
+            description: val.status === 'critical'
+              ? `${metricNames[key] || key} is critically low at ${(val.score ?? 0).toFixed(1)}. Immediate attention required.`
+              : `${metricNames[key] || key} is below target at ${(val.score ?? 0).toFixed(1)}. Monitor closely.`,
+            timestamp: snapshot.timestamp ? new Date(snapshot.timestamp) : new Date(),
           })
         }
       })
     }
   })
 
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-3 font-semibold text-slate-600">Metric</th>
-              <th className="text-left px-4 py-3 font-semibold text-slate-600">Score</th>
-              <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-              <th className="text-left px-4 py-3 font-semibold text-slate-600">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-slate-800">{row.metric}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${row.score >= 80 ? 'bg-emerald-500' :
-                            row.score >= 60 ? 'bg-amber-500' : 'bg-red-500'
-                          }`}
-                        style={{ width: `${Math.min(row.score, 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-slate-700 font-mono text-xs">{row.score.toFixed(1)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full
-                                        ${row.status === 'healthy' ? 'bg-emerald-50 text-emerald-600' :
-                      row.status === 'warn' ? 'bg-amber-50 text-amber-600' :
-                        'bg-red-50 text-red-600'}`}>
-                    {row.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-slate-400">{row.timestamp}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {rows.length > 0 && (
-        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-400">
-          Showing {rows.length} metrics
-        </div>
-      )}
-    </div>
-  )
+  return alerts
 }
 
 // ═══════════════════════════════════
@@ -381,6 +576,8 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeView, setActiveView] = useState<ActiveView>('home')
+  const [syncing, setSyncing] = useState(false)
+  const [downloadingReport, setDownloadingReport] = useState(false)
   const { addNotification } = useNotifications()
 
   useEffect(() => {
@@ -406,14 +603,11 @@ export default function DashboardPage() {
   const fetchInitialData = async () => {
     try {
       const treeData = await apiClient.getTree()
-      if (treeData.data?.snapshots) {
-        setMetrics(treeData.data.snapshots)
-      }
+      if (treeData.data?.snapshots) setMetrics(treeData.data.snapshots)
       if (treeData.data?.warehouses) {
         setWarehouses(treeData.data.warehouses)
-        if (treeData.data.warehouses.length > 0) {
+        if (treeData.data.warehouses.length > 0)
           setSelectedWarehouse(treeData.data.warehouses[0].id || treeData.data.warehouses[0]._id)
-        }
       }
     } catch (error) {
       console.error('Error fetching initial data:', error)
@@ -429,8 +623,7 @@ export default function DashboardPage() {
       if (treeData.data?.snapshots) {
         setMetrics(treeData.data.snapshots)
         addNotification({
-          type: 'success',
-          title: 'Warehouse Updated',
+          type: 'success', title: 'Warehouse Updated',
           message: `Switched to ${warehouses.find(w => (w.id || w._id) === warehouseId)?.name}`,
           duration: 3000
         })
@@ -452,15 +645,82 @@ export default function DashboardPage() {
     }
   }
 
-  // Compute summary data
-  const rootSnapshot = metrics[0]
+  const handleSyncML = async () => {
+    if (!selectedWarehouse || syncing) return
+    setSyncing(true)
+    try {
+      const result = await apiClient.syncML(selectedWarehouse)
+      if (result.data) {
+        addNotification({
+          type: 'success', title: 'ML Predictions Synced',
+          message: `Dashboard updated with ML-predicted scores (POI: ${result.data.predictions?.poi?.toFixed(1) ?? '?'})`,
+          duration: 5000
+        })
+        const treeData = await apiClient.getTree(selectedWarehouse)
+        if (treeData.data?.snapshots) setMetrics(treeData.data.snapshots)
+      } else {
+        addNotification({ type: 'error', title: 'Sync Failed', message: result.error || 'ML sync failed', duration: 5000 })
+      }
+    } catch (error) {
+      console.error('ML sync error:', error)
+      addNotification({ type: 'error', title: 'Sync Error', message: 'Could not connect to ML engine. Is it running?', duration: 5000 })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleDownloadReport = async () => {
+    if (!selectedWarehouse || downloadingReport) return
+    setDownloadingReport(true)
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+      const response = await fetch(`${API_BASE_URL}/reports/download/${selectedWarehouse}`, { credentials: 'include' })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to generate report')
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Nexen_Report_${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      addNotification({ type: 'success', title: 'Report Downloaded', message: 'PDF report has been downloaded successfully', duration: 4000 })
+    } catch (error: any) {
+      console.error('Download report error:', error)
+      addNotification({ type: 'error', title: 'Download Failed', message: error.message || 'Failed to download report', duration: 5000 })
+    } finally {
+      setDownloadingReport(false)
+    }
+  }
+
+  // ── Compute summary data ──
+  const filteredMetrics = metrics.filter(s => s.warehouseId === selectedWarehouse || !selectedWarehouse)
+  const rootSnapshot = filteredMetrics[0]
   const rootStatus = rootSnapshot?.rootStatus || 'healthy'
   const rootScore = rootSnapshot?.rootScore ?? 0
-  const alerts = generateAlerts(metrics)
-  const criticalCount = alerts.filter(a => a.severity === 'critical').length
-  const warnCount = alerts.filter(a => a.severity === 'warn').length
+  const alerts = generateAlerts(filteredMetrics)
+  const criticalCount = alerts.filter(a => a.status === 'critical').length
+  const warnCount = alerts.filter(a => a.status === 'warn').length
 
-  // View title map
+  const poiData = getMetricFromSnapshots(filteredMetrics, 'poi')
+  const otdData = getMetricFromSnapshots(filteredMetrics, 'otd')
+  const wptData = getMetricFromSnapshots(filteredMetrics, 'wpt')
+  const dfrData = getMetricFromSnapshots(filteredMetrics, 'dfr')
+
+  const metricRowCount = filteredMetrics.reduce((count, snap) => {
+    if (snap.metricTree && typeof snap.metricTree === 'object') {
+      return count + Object.keys(snap.metricTree).filter(k => {
+        const v = (snap.metricTree as Record<string, any>)[k]
+        return v && typeof v === 'object' && 'score' in v
+      }).length
+    }
+    return count
+  }, 0)
+
   const viewTitles: Record<ActiveView, { title: string; subtitle: string }> = {
     'home': { title: `Welcome back, ${user?.name?.split(' ')[0] || 'User'}`, subtitle: 'Supply chain performance overview' },
     'metric-tree': { title: 'Metric Tree', subtitle: 'Interactive visualization of your supply chain metrics' },
@@ -471,18 +731,27 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Loading dashboard...</p>
+      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+        <div className="text-center animate-fade-in">
+          <div className="w-12 h-12 border-4 rounded-full animate-spin mx-auto mb-4"
+            style={{ borderColor: 'rgba(99,102,241,0.2)', borderTopColor: '#6366f1' }} />
+          <p className="text-sm gradient-text font-medium">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
+  const quickStats = [
+    { id: 'poi', name: 'POI', ...poiData },
+    { id: 'otd', name: 'OTD', ...otdData },
+    { id: 'wpt', name: 'WPT', ...wptData },
+    { id: 'dfr', name: 'DFR', ...dfrData },
+  ]
+
+  const cardIcons = [icons.tree, icons.alert, icons.chart, icons.table]
+
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
+    <div className="flex min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -496,28 +765,56 @@ export default function DashboardPage() {
       />
 
       {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-[68px]' : 'ml-[280px]'}`}>
-        {/* Top Bar */}
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 py-4">
+      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-17' : 'ml-65'}`}>
+
+        {/* Top Bar (Glass) */}
+        <header className="sticky top-0 z-30 glass-header px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-slate-800">
+              <h1 className="text-title" style={{ color: 'var(--text-primary)' }}>
                 {viewTitles[activeView].title}
               </h1>
-              <p className="text-sm text-slate-400">{viewTitles[activeView].subtitle}</p>
+              <p className="text-body" style={{ color: 'var(--text-muted)' }}>{viewTitles[activeView].subtitle}</p>
             </div>
             <div className="flex items-center gap-3">
+              {/* Download Report */}
+              <button onClick={handleDownloadReport} disabled={downloadingReport || !selectedWarehouse}
+                className="btn-glass flex items-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                {downloadingReport ? (
+                  <><div className="w-4 h-4 border-2 border-emerald-300/30 border-t-emerald-400 rounded-full animate-spin" /> Generating...</>
+                ) : (
+                  <>{icons.download} <span className="hidden sm:inline">Download Report</span></>
+                )}
+              </button>
+
+              {/* Back Button */}
               {activeView !== 'home' && (
-                <button
-                  onClick={() => setActiveView('home')}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  ← Back to Dashboard
+                <button onClick={() => setActiveView('home')}
+                  className="btn-glass flex items-center gap-2 text-sm">
+                  {icons.back} Back
                 </button>
               )}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
-                <div className={`w-2 h-2 rounded-full ${rootStatus === 'healthy' ? 'bg-emerald-500' : rootStatus === 'warn' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                <span className="text-xs font-medium text-slate-600">
+
+              {/* Sync ML */}
+              <button onClick={handleSyncML} disabled={syncing || !selectedWarehouse}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: syncing ? 'rgba(99,102,241,0.1)' : 'var(--accent-gradient)',
+                  color: syncing ? '#818cf8' : 'white',
+                  boxShadow: syncing ? 'none' : '0 4px 16px -4px rgba(99,102,241,0.4)',
+                }}>
+                {syncing ? (
+                  <><div className="w-4 h-4 border-2 border-indigo-300/30 border-t-indigo-400 rounded-full animate-spin" /> Syncing...</>
+                ) : (
+                  <>{icons.sync} <span className="hidden sm:inline">Sync ML</span></>
+                )}
+              </button>
+
+              {/* Status Badge */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                <div className={`status-dot ${rootStatus === 'healthy' ? 'status-healthy' :
+                  rootStatus === 'warn' ? 'status-warning' : 'status-critical'}`} />
+                <span className="text-caption font-medium hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>
                   {warehouses.find(w => (w.id || w._id) === selectedWarehouse)?.name || 'No Warehouse'}
                 </span>
               </div>
@@ -532,71 +829,76 @@ export default function DashboardPage() {
               {/* Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <DashboardCard
-                  icon="🌳"
+                  icon={cardIcons[0]}
                   title="Metric Tree"
                   value={rootScore.toFixed(1)}
                   subtitle="Root POI score across 8 metrics"
                   status={rootStatus}
                   color="indigo"
                   onClick={() => setActiveView('metric-tree')}
+                  delay={0}
                 />
                 <DashboardCard
-                  icon="🔔"
+                  icon={cardIcons[1]}
                   title="Alerts"
                   value={`${criticalCount + warnCount}`}
                   subtitle={`${criticalCount} critical • ${warnCount} warnings`}
                   status={criticalCount > 0 ? 'critical' : warnCount > 0 ? 'warn' : 'healthy'}
                   color="amber"
                   onClick={() => setActiveView('alerts')}
+                  delay={100}
                 />
                 <DashboardCard
-                  icon="📊"
+                  icon={cardIcons[2]}
                   title="Charts"
                   value="14d"
                   subtitle="Trend analysis for all metrics"
                   color="emerald"
                   onClick={() => setActiveView('charts')}
+                  delay={200}
                 />
                 <DashboardCard
-                  icon="📋"
+                  icon={cardIcons[3]}
                   title="Data Table"
-                  value={`${Object.keys(rootSnapshot?.metricTree || {}).length}`}
+                  value={`${metricRowCount}`}
                   subtitle="Tabular view of metric values"
                   color="violet"
                   onClick={() => setActiveView('data-table')}
+                  delay={300}
                 />
               </div>
 
               {/* Quick Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {(['poi', 'otd', 'wpt', 'dfr'] as const).map((metricId) => {
-                  const tree = rootSnapshot?.metricTree || {}
-                  const val = tree[metricId]
-                  const score = val?.score ?? 0
-                  const status = val?.status || 'healthy'
-                  const names: Record<string, string> = { poi: 'POI', otd: 'OTD', wpt: 'WPT', dfr: 'DFR' }
-                  return (
-                    <div key={metricId} className="bg-white rounded-xl border border-slate-200 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-slate-500">{names[metricId]}</span>
-                        <div className={`w-2 h-2 rounded-full ${status === 'healthy' ? 'bg-emerald-500' : status === 'warn' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                      </div>
-                      <p className="text-2xl font-bold text-slate-800">{score.toFixed(1)}</p>
-                      <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
-                          style={{ width: `${Math.min(score, 100)}%` }}
-                        />
-                      </div>
+                {quickStats.map((stat, i) => (
+                  <div key={stat.id} className="glass-card p-4 animate-slide-up" style={{ animationDelay: `${400 + i * 80}ms` }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-caption font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{stat.name}</span>
+                      <div className={`status-dot ${stat.status === 'healthy' ? 'status-healthy' :
+                        stat.status === 'warn' ? 'status-warning' : 'status-critical'}`} />
                     </div>
-                  )
-                })}
+                    <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stat.score.toFixed(1)}</p>
+                    <div className="w-full h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: 'var(--border-subtle)' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.min(stat.score, 100)}%`,
+                          background: stat.score >= 80
+                            ? 'linear-gradient(90deg, #10b981, #34d399)'
+                            : stat.score >= 60
+                              ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                              : 'linear-gradient(90deg, #ef4444, #f87171)',
+                          animation: 'progressFill 1s ease-out',
+                        }} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {activeView === 'metric-tree' && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <div className="glass-card p-6 animate-fade-in">
               <MetricTree
                 data={metrics}
                 onNodeSelect={setSelectedNode}
@@ -606,14 +908,14 @@ export default function DashboardPage() {
           )}
 
           {activeView === 'alerts' && <AlertsView alerts={alerts} />}
-
           {activeView === 'charts' && <ChartsView warehouseId={selectedWarehouse} />}
-
-          {activeView === 'data-table' && <DataTableView metrics={metrics} />}
+          {activeView === 'data-table' && <DataTableView metrics={filteredMetrics} />}
         </div>
       </main>
 
-      {/* AI Copilot Sidebar */}
+      {/* Floating Chatbot Widget */}
+      <LogicAssistantWidget />
+
       <AICopilotSidebar
         isOpen={!!selectedNode}
         onClose={() => setSelectedNode(null)}
@@ -622,38 +924,4 @@ export default function DashboardPage() {
       />
     </div>
   )
-}
-
-// ═══════════════════════════════════
-// Helper: Generate alerts from metric data
-// ═══════════════════════════════════
-function generateAlerts(metrics: MetricSnapshot[]): Alert[] {
-  const alerts: Alert[] = []
-  const metricNames: Record<string, string> = {
-    poi: 'Perfect Order Index', otd: 'On-Time Delivery', wpt: 'Warehouse Processing',
-    oa: 'Order Accuracy', dfr: 'Damage Free Rate', tt: 'Transit Time',
-    pick: 'Picking Time', label: 'Label Generation', pack: 'Packing Speed',
-  }
-
-  metrics.forEach((snapshot) => {
-    if (snapshot.metricTree && typeof snapshot.metricTree === 'object') {
-      Object.entries(snapshot.metricTree).forEach(([key, val]: [string, any]) => {
-        if (val && typeof val === 'object' && val.status && val.status !== 'healthy') {
-          alerts.push({
-            id: `${snapshot.warehouseId}-${key}`,
-            metric: metricNames[key] || key,
-            warehouse: snapshot.warehouseId,
-            severity: val.status as 'critical' | 'warn',
-            score: val.score ?? 0,
-            message: val.status === 'critical'
-              ? `${metricNames[key] || key} is critically low at ${(val.score ?? 0).toFixed(1)}. Immediate attention required.`
-              : `${metricNames[key] || key} is below target at ${(val.score ?? 0).toFixed(1)}. Monitor closely.`,
-            timestamp: snapshot.timestamp ? new Date(snapshot.timestamp).toLocaleString() : 'Now',
-          })
-        }
-      })
-    }
-  })
-
-  return alerts
 }

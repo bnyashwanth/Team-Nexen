@@ -175,5 +175,16 @@ export const apiClient = {
       credentials: 'include'
     })
     return handleResponse(response)
-  }
+  },
+
+  // ML sync endpoint
+  syncML: async (warehouseId: string): Promise<ApiResponse<{ message: string; predictions: Record<string, number> }>> => {
+    const response = await fetch(`${API_BASE_URL}/ml/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ warehouse_id: warehouseId })
+    })
+    return handleResponse(response)
+  },
 }

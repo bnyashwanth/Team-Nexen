@@ -76,7 +76,7 @@ export default function TrendChart({ metricId, warehouseId, days = 7 }: TrendCha
     const avgScore = trendData.reduce((sum, d) => sum + d.score, 0) / trendData.length
 
     return (
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white rounded-lg">
             <h3 className="text-sm font-medium text-gray-700 mb-2">
                 {metricId.toUpperCase()} Score Trend — {days} Days
             </h3>
@@ -103,6 +103,7 @@ export default function TrendChart({ metricId, warehouseId, days = 7 }: TrendCha
                         strokeWidth={2}
                         dot={{ r: 3 }}
                         activeDot={{ r: 5 }}
+                        isAnimationActive={true}
                     />
                 </LineChart>
             </ResponsiveContainer>
