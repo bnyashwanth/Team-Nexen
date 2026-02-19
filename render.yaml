@@ -1,0 +1,51 @@
+# Render Blueprint — deploy both backend services in one click
+# https://render.com/docs/blueprint-spec
+
+services:
+  # ─────────────────────────────────────
+  # Node.js Backend (Express API)
+  # ─────────────────────────────────────
+  - type: web
+    name: eurekathon-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npx tsc
+    startCommand: node dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        sync: false  # Set manually to your Vercel URL
+      - key: SUPABASE_URL
+        sync: false  # Set manually
+      - key: SUPABASE_ANON_KEY
+        sync: false  # Set manually
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # Set manually
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ML_ENGINE_URL
+        fromService:
+          name: eurekathon-ml-engine
+          type: web
+          property: hostport
+    healthCheckPath: /api/health
+
+  # ─────────────────────────────────────
+  # Python ML Engine (Flask API)
+  # ─────────────────────────────────────
+  - type: web
+    name: eurekathon-ml-engine
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: ml-engine
+    buildCommand: pip install -r requirements.txt && python train_all.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.6"
+      - key: ML_PORT
+        fromEnvironment: PORT

@@ -25,7 +25,7 @@ def load_model(filename):
     if os.path.exists(path):
         with open(path, "rb") as f:
             return pickle.load(f)
-    print(f"⚠️  Model not found: {path}")
+    print(f"[WARN] Model not found: {path}")
     return None
 
 
@@ -40,13 +40,13 @@ otd_model = load_model("model_otd.pkl")
 
 print("=" * 50)
 print("ML Engine Model Status:")
-print(f"  Anomaly Detection  : {'✅ Loaded' if anomaly_model else '❌ Not found'}")
-print(f"  Z-Score Regression : {'✅ Loaded' if z_score_model else '❌ Not found'}")
-print(f"  Root Cause Classif.: {'✅ Loaded' if root_cause_model else '❌ Not found'}")
-print(f"  POI Forecasting    : {'✅ Loaded' if poi_model else '❌ Not found'}")
-print(f"  POI Actual Score   : {'✅ Loaded' if poi_actual_model else '❌ Not found'}")
-print(f"  WPT Score          : {'✅ Loaded' if wpt_model else '❌ Not found'}")
-print(f"  OTD Score          : {'✅ Loaded' if otd_model else '❌ Not found'}")
+print(f"  Anomaly Detection  : {'[OK] Loaded' if anomaly_model else '[X] Not found'}")
+print(f"  Z-Score Regression : {'[OK] Loaded' if z_score_model else '[X] Not found'}")
+print(f"  Root Cause Classif.: {'[OK] Loaded' if root_cause_model else '[X] Not found'}")
+print(f"  POI Forecasting    : {'[OK] Loaded' if poi_model else '[X] Not found'}")
+print(f"  POI Actual Score   : {'[OK] Loaded' if poi_actual_model else '[X] Not found'}")
+print(f"  WPT Score          : {'[OK] Loaded' if wpt_model else '[X] Not found'}")
+print(f"  OTD Score          : {'[OK] Loaded' if otd_model else '[X] Not found'}")
 print("=" * 50)
 
 
@@ -361,5 +361,5 @@ def predict_otd():
 # =====================
 if __name__ == "__main__":
     port = int(os.environ.get("ML_PORT", 5001))
-    print(f"\n🚀 ML Engine starting on port {port}")
+    print(f"\nML Engine starting on port {port}")
     app.run(host="0.0.0.0", port=port, debug=True)

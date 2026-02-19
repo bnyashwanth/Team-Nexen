@@ -35,7 +35,7 @@ def train():
     path = os.path.join(MODELS_DIR, "model_otd.pkl")
     with open(path, "wb") as f:
         pickle.dump(model, f)
-    print(f"  ✅ OTD Score → {path}")
+    print(f"  [OK] OTD Score -> {path}")
     return model
 
 if __name__ == "__main__":

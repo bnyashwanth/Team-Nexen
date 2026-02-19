@@ -37,7 +37,7 @@ def train():
     path = os.path.join(MODELS_DIR, "root_cause_model.pkl")
     with open(path, "wb") as f:
         pickle.dump(model, f)
-    print(f"  ✅ Root Cause Classification → {path}")
+    print(f"  [OK] Root Cause Classification -> {path}")
     return model
 
 if __name__ == "__main__":

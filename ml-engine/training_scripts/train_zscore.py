@@ -37,7 +37,7 @@ def train():
     path = os.path.join(MODELS_DIR, "z_model.pkl")
     with open(path, "wb") as f:
         pickle.dump(model, f)
-    print(f"  ✅ Z-Score Regression → {path}")
+    print(f"  [OK] Z-Score Regression -> {path}")
     return model
 
 if __name__ == "__main__":

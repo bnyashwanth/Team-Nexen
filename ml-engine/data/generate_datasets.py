@@ -54,7 +54,7 @@ def generate_dataset1():
     df = pd.DataFrame(data)
     path = os.path.join(OUT_DIR, "dataset1_anomaly_detection.csv")
     df.to_csv(path, index=False)
-    print(f"✅ Dataset 1: {len(df)} rows → {path}")
+    print(f"[OK] Dataset 1: {len(df)} rows -> {path}")
     return df
 
 
@@ -89,7 +89,7 @@ def generate_dataset2():
     df = pd.DataFrame(data)
     path = os.path.join(OUT_DIR, "dataset2_score_forecasting.csv")
     df.to_csv(path, index=False)
-    print(f"✅ Dataset 2: {len(df)} rows → {path}")
+    print(f"[OK] Dataset 2: {len(df)} rows -> {path}")
     return df
 
 
@@ -154,7 +154,7 @@ def generate_dataset3():
     df = pd.DataFrame(data)
     path = os.path.join(OUT_DIR, "dataset3_rootcause_classifier.csv")
     df.to_csv(path, index=False)
-    print(f"✅ Dataset 3: {len(df)} rows → {path}")
+    print(f"[OK] Dataset 3: {len(df)} rows -> {path}")
     return df
 
 
@@ -199,7 +199,7 @@ def generate_dataset4():
 
     path = os.path.join(OUT_DIR, "dataset4_weight_regression.csv")
     df.to_csv(path, index=False)
-    print(f"✅ Dataset 4: {len(df)} rows → {path}")
+    print(f"[OK] Dataset 4: {len(df)} rows -> {path}")
     return df
 
 
@@ -214,5 +214,5 @@ if __name__ == "__main__":
     generate_dataset2()
     generate_dataset3()
     generate_dataset4()
-    print("\n✅ All datasets generated successfully!")
-    print(f"📁 Output directory: {OUT_DIR}")
+    print("\n[OK] All datasets generated successfully!")
+    print(f"Output directory: {OUT_DIR}")

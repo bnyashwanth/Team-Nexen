@@ -700,6 +700,163 @@ function ProductAnalysis() {
         </div>
     )
 }
+// ═══════════════════════════════════
+// ML Engine Diagnostics
+// ═══════════════════════════════════
+function MLDiagnostics() {
+    const [health, setHealth] = useState<any>(null)
+    const [healthLoading, setHealthLoading] = useState(true)
+    const [healthError, setHealthError] = useState('')
+    const [predictionModel, setPredictionModel] = useState('analyze')
+    const [predictionInput, setPredictionInput] = useState('')
+    const [predictionResult, setPredictionResult] = useState<any>(null)
+    const [predicting, setPredicting] = useState(false)
+
+    useEffect(() => { fetchHealth() }, [])
+
+    const fetchHealth = async () => {
+        setHealthLoading(true)
+        setHealthError('')
+        try {
+            const res = await fetch(`${API}/ml/health`, { credentials: 'include' })
+            const data = await res.json()
+            setHealth(data)
+        } catch (err: any) {
+            setHealthError(err.message || 'Failed to connect to ML Engine')
+        } finally {
+            setHealthLoading(false)
+        }
+    }
+
+    const runPrediction = async () => {
+        setPredicting(true)
+        setPredictionResult(null)
+        try {
+            const body = predictionInput ? JSON.parse(predictionInput) : {}
+            const endpoint = predictionModel.startsWith('predict/')
+                ? `/ml/${predictionModel}`
+                : `/ml/${predictionModel}`
+            const res = await fetch(`${API}${endpoint}`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+            const data = await res.json()
+            setPredictionResult(data)
+        } catch (err: any) {
+            setPredictionResult({ error: err.message || 'Prediction failed' })
+        } finally {
+            setPredicting(false)
+        }
+    }
+
+    const sampleInputs: Record<string, string> = {
+        'analyze': JSON.stringify({ score: 45, rolling_avg_7d: 78, hour_of_day: 14, day_of_week: 3, orders_volume: 1200, staff_count: 45, warehouse_id: 'WH-001', metric_id: 'poi' }, null, 2),
+        'root-cause': JSON.stringify({ poi_score: 45, label_score: 25, pick_score: 70, pack_score: 80, tt_score: 60, oa_score: 65, orders_volume: 1200, warehouse_id: 'WH-001', zone: 'North' }, null, 2),
+        'predict/poi': JSON.stringify({ day_of_week: 3, is_flash_sale_day: 0, orders_volume: 1000, poi_score_t_minus_1: 72, poi_score_t_minus_2: 75, poi_score_t_minus_3: 70, warehouse_id: 'WH-001' }, null, 2),
+        'predict/wpt': JSON.stringify({ label_score: 80, pick_score: 85, pack_score: 90 }, null, 2),
+        'predict/otd': JSON.stringify({ label_score: 80, pick_score: 85, pack_score: 90, wpt_score_actual: 84, tt_score: 78 }, null, 2),
+        'predict/poi-actual': JSON.stringify({ label_score: 80, pick_score: 85, pack_score: 90, wpt_score_actual: 84, tt_score: 78 }, null, 2),
+    }
+
+    return (
+        <div className="space-y-8">
+            <SectionHeader title="ML Engine Diagnostics" subtitle="Monitor model status and test predictions live" />
+
+            {/* Health Status */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Model Status</h4>
+                    <button onClick={fetchHealth} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+                        Refresh
+                    </button>
+                </div>
+                <div className="p-6">
+                    {healthLoading ? (
+                        <LoadingSpinner />
+                    ) : healthError ? (
+                        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-xl text-sm border border-red-100">
+                            <span className="font-medium">ML Engine Unreachable:</span> {healthError}
+                            <p className="mt-1 text-xs text-red-500">Make sure the Flask API is running on port 5001</p>
+                        </div>
+                    ) : health ? (
+                        <div>
+                            <div className="flex items-center gap-2 mb-5">
+                                <div className={`h-3 w-3 rounded-full ${health.status === 'connected' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                <span className={`text-sm font-semibold ${health.status === 'connected' ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {health.status === 'connected' ? 'Connected' : 'Disconnected'}
+                                </span>
+                                <span className="text-xs text-gray-400">({health.ml_engine_url})</span>
+                            </div>
+                            {health.models && (
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                    {Object.entries(health.models).map(([name, loaded]) => (
+                                        <div key={name} className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${loaded ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+                                            }`}>
+                                            <div className={`h-2 w-2 rounded-full ${loaded ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                                            <span className={`text-xs font-medium ${loaded ? 'text-emerald-800' : 'text-red-700'}`}>
+                                                {name.replace(/_/g, ' ')}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
+            {/* Prediction Tester */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Live Prediction Tester</h4>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                        {Object.keys(sampleInputs).map(endpoint => (
+                            <button
+                                key={endpoint}
+                                onClick={() => { setPredictionModel(endpoint); setPredictionInput(sampleInputs[endpoint]); setPredictionResult(null) }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${predictionModel === endpoint
+                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                {endpoint}
+                            </button>
+                        ))}
+                    </div>
+
+                    <textarea
+                        value={predictionInput}
+                        onChange={e => setPredictionInput(e.target.value)}
+                        placeholder='{ "score": 75, ... }'
+                        rows={8}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all resize-none"
+                    />
+
+                    <button
+                        onClick={runPrediction}
+                        disabled={predicting}
+                        className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 transition-all shadow-sm"
+                    >
+                        {predicting ? 'Running...' : 'Run Prediction'}
+                    </button>
+
+                    {predictionResult && (
+                        <div className="bg-gray-900 rounded-xl p-5 overflow-auto">
+                            <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wider">Response</p>
+                            <pre className="text-sm text-emerald-400 font-mono whitespace-pre-wrap">
+                                {JSON.stringify(predictionResult, null, 2)}
+                            </pre>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
 
 // ═══════════════════════════════════
 // Sidebar Navigation Items
@@ -710,6 +867,7 @@ const NAV_ITEMS = [
     { id: 'anomalies', label: 'Anomaly Control', icon: '🚨' },
     { id: 'users', label: 'User Management', icon: '👥' },
     { id: 'logs', label: 'System Logs', icon: '📋' },
+    { id: 'ml-engine', label: 'ML Engine', icon: '🧠' },
     { id: 'profile', label: 'Profile', icon: '👤' },
 ]
 
@@ -770,6 +928,7 @@ export default function AdminPage() {
             case 'anomalies': return <AnomalyControl />
             case 'users': return <UserManagement />
             case 'logs': return <SystemLogs />
+            case 'ml-engine': return <MLDiagnostics />
             case 'profile': return <ProfileMaintenance user={user} />
             default: return <UnifiedWarehouseMetrics />
         }

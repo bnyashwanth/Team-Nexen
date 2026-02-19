@@ -35,7 +35,7 @@ def train():
     path = os.path.join(MODELS_DIR, "model_poi_actual_score.pkl")
     with open(path, "wb") as f:
         pickle.dump(model, f)
-    print(f"  ✅ POI Actual Score → {path}")
+    print(f"  [OK] POI Actual Score -> {path}")
     return model
 
 if __name__ == "__main__":

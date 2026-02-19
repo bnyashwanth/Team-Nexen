@@ -17,6 +17,7 @@ import ingestRoutes from './routes/ingest'
 import seedRoutes from './routes/seed'
 import adminRoutes from './routes/admin'
 import productRoutes from './routes/product'
+import mlRoutes from './routes/ml'
 
 // Import middleware
 import authMiddleware from './middleware/auth'
@@ -72,6 +73,7 @@ app.use('/api/ingest', authMiddleware, ingestRoutes)
 app.use('/api/admin', authMiddleware, adminRoutes)
 app.use('/api/admin/product', authMiddleware, productRoutes)
 app.use('/api/seed', seedRoutes) // Public route
+app.use('/api/ml', authMiddleware, mlRoutes)
 
 // Health check
 app.get('/api/health', async (req, res) => {
