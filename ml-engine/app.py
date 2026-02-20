@@ -9,6 +9,7 @@ import pickle
 import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from score import calculate_score
 
 app = Flask(__name__)
 CORS(app)
@@ -350,6 +351,33 @@ def predict_otd():
 
         prediction = float(otd_model.predict(features)[0])
         return jsonify({"otd_score": round(prediction, 2)})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+
+# =====================
+# GENERAL SCORE CALCULATION
+# =====================
+@app.route("/api/calculate-score", methods=["POST"])
+def calculate_score_api():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
+
+        # Calculate score using the imported function
+        score = calculate_score(data)
+        
+        return jsonify({
+            "score": float(score),
+            "details": {
+                "input_data": data,
+                "model_used": "score.py logic"
+            }
+        })
 
     except Exception as e:
         traceback.print_exc()

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { apiClient, type User } from '@/lib/api'
 import MetricTree from '@/components/MetricTree'
 
+
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 async function adminFetch(path: string, opts?: RequestInit) {
@@ -390,7 +391,7 @@ function UnifiedWarehouseMetrics() {
     const [result, setResult] = useState<any>(null)
 
     const [whForm, setWhForm] = useState({ id: '', name: '', zone: '', city: '', is_active: true })
-    const [metricForm, setMetricForm] = useState({ metric_id: 'pick', staff_count: '', hours_of_day: '', day_of_week: '1' })
+    const [metricForm, setMetricForm] = useState({ metric_id: 'pick', staff_count: '', hours_of_day: '', day_of_week: '1', order_volume: '' })
     const [isNew, setIsNew] = useState(true)
 
     const METRICS = [
@@ -435,7 +436,8 @@ function UnifiedWarehouseMetrics() {
                 metric_id: metricForm.metric_id,
                 staff_count: parseInt(metricForm.staff_count),
                 hours_of_day: parseInt(metricForm.hours_of_day),
-                day_of_week: parseInt(metricForm.day_of_week)
+                day_of_week: parseInt(metricForm.day_of_week),
+                order_volume: parseInt(metricForm.order_volume)
             }
         }
 
@@ -540,6 +542,13 @@ function UnifiedWarehouseMetrics() {
                                 className={inputClass}>
                                 {METRICS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                             </select>
+                        </div>
+
+                        <div>
+                            <label className={labelClass}>Order Volume</label>
+                            <input type="number" required min="0" value={metricForm.order_volume}
+                                onChange={e => setMetricForm(p => ({ ...p, order_volume: e.target.value }))}
+                                className={inputClass} placeholder="1200" />
                         </div>
 
                         <div>
@@ -819,8 +828,8 @@ function MLDiagnostics() {
                                 key={endpoint}
                                 onClick={() => { setPredictionModel(endpoint); setPredictionInput(sampleInputs[endpoint]); setPredictionResult(null) }}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${predictionModel === endpoint
-                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 {endpoint}
@@ -867,13 +876,12 @@ const NAV_ITEMS = [
     { id: 'anomalies', label: 'Anomaly Control', icon: '🚨' },
     { id: 'users', label: 'User Management', icon: '👥' },
     { id: 'logs', label: 'System Logs', icon: '📋' },
-    { id: 'ml-engine', label: 'ML Engine', icon: '🧠' },
-    { id: 'profile', label: 'Profile', icon: '👤' },
+    { id: 'ml-engine', label: 'ML Diagnostics', icon: '⚙️' },
+    { id: 'profile', label: 'Profile Maintenance', icon: '👤' },
 ]
 
-// ═══════════════════════════════════
-// Main Admin Dashboard
-// ═══════════════════════════════════
+
+// ... rest of the code remains the same ...
 export default function AdminPage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
@@ -935,11 +943,11 @@ export default function AdminPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50/50 flex">
+        <div className="min-h-screen bg-white flex">
             {/* Sidebar */}
-            <aside className="w-[280px] bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 text-white flex flex-col min-h-screen shrink-0 shadow-2xl">
+            <aside className="w-[280px] bg-white border-r border-gray-200 text-gray-900 flex flex-col min-h-screen shrink-0 shadow-sm">
                 {/* Logo */}
-                <div className="px-6 py-6 border-b border-white/[0.06]">
+                <div className="px-6 py-6 border-b border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
                             <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -947,8 +955,8 @@ export default function AdminPage() {
                             </svg>
                         </div>
                         <div>
-                            <div className="font-bold text-sm tracking-tight">ShopSwift Admin</div>
-                            <div className="text-[11px] text-indigo-300/70 font-medium">Supply Chain Portal</div>
+                            <div className="font-bold text-sm tracking-tight text-gray-900">ShopSwift Admin</div>
+                            <div className="text-[11px] text-gray-500 font-medium">Supply Chain Portal</div>
                         </div>
                     </div>
                 </div>
@@ -960,14 +968,14 @@ export default function AdminPage() {
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all duration-200 ${activeTab === item.id
-                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/20'
-                                : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
+                                ? 'bg-indigo-50 text-indigo-700 shadow-sm'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                 }`}
                         >
                             <span className="text-base shrink-0">{item.icon}</span>
                             <span>{item.label}</span>
                             {activeTab === item.id && (
-                                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
                             )}
                         </button>
                     ))}
@@ -976,25 +984,25 @@ export default function AdminPage() {
                 {/* Bottom: Quick Link */}
                 <div className="px-4 pb-2">
                     <a href="/dashboard"
-                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-[12px] text-slate-500 hover:text-indigo-300 hover:bg-white/[0.04] transition-all font-medium">
+                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-[12px] text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-medium">
                         <span>←</span>
                         <span>Back to Dashboard</span>
                     </a>
                 </div>
 
                 {/* User + Logout */}
-                <div className="px-4 py-5 border-t border-white/[0.06]">
+                <div className="px-4 py-5 border-t border-gray-100">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="h-9 w-9 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md">
                             {user.name?.[0]?.toUpperCase() || 'A'}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold truncate text-white/90">{user.name}</div>
-                            <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+                            <div className="text-sm font-semibold truncate text-gray-900">{user.name}</div>
+                            <div className="text-[11px] text-gray-500 truncate">{user.email}</div>
                         </div>
                     </div>
                     <button onClick={handleLogout}
-                        className="w-full text-[12px] py-2.5 px-3 border border-white/10 rounded-xl text-slate-400 hover:bg-white/[0.06] hover:text-white hover:border-white/20 transition-all font-medium">
+                        className="w-full text-[12px] py-2.5 px-3 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300 transition-all font-medium">
                         Sign Out
                     </button>
                 </div>

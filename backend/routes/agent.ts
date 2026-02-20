@@ -1,105 +1,53 @@
 import express, { Request, Response } from 'express'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { supabase } from '../lib/supabase'
 
 const router = express.Router()
 
-// ── API Key rotation pool (free tier keys from team) ──
-// Each key has separate quota — rotates to next key on 429 rate-limit
-const API_KEYS = [
-  process.env.GEMINI_API_KEY || '',
-  'AIzaSyDTLyZ2t1nRKoqkOlohqRjvm3BskWltQLA',   // Ravi
-  'AIzaSyCPDKx3PiVnUpq-27_is0zdXEksjUk-wxc',   // Ravi
-  'AIzaSyAvKoUYZ0YHsP377El60oteMVfap44QHAU',   // Spoorthi
-  'AIzaSyD38uBAEjwq1rbuhcsqJkRuFfxvyKLDf4I',   // Spoorthi
-  'AIzaSyASbjjfaghzswxByqKkoJEUfsj5iAVtap4',   // Spoorthi
-  'AIzaSyDqhWuPM3IN8xlCY9-rDErlW4PAZYxXmTs',   // Spoorthi
-  'AIzaSyCjfSJNw5E6421Y2fTivEQ554lApwOZZDY',   // Yashwanth
-  'AIzaSyCY5XF4o5lQwO-Lcz-HIeqje2Wzc-FRSB0',   // Yashwanth
-  'AIzaSyDkVHHlyyWnkIWow-h1MrT3LJrems28mOA',   // Yashwanth
-  'AIzaSyCxlfJQXdpcZ2xLl_KLzjspAH32iHlW9z0',   // Yashwanth
-  'AIzaSyCMWtSGIFUe_2vrtoHx7lrqp-21awaOo1I',   // Yashwanth
-  'AIzaSyDTF3lRkPF5mG5QAB4dYS5teRNPRkWnmwM',   // Yashwanth
-].filter(k => k && k.length > 10)
+// ── Rule-Based Logic ──
 
-let currentKeyIndex = 0
+function getRuleBasedResponse(message: string, contextNode?: string, contextData?: any): string {
+  const msgLower = message.toLowerCase()
+  const metric = contextData?.metric || contextNode || 'unknown'
+  const score = contextData?.score
+  const status = contextData?.status
 
-function getNextKey(): string {
-  const key = API_KEYS[currentKeyIndex % API_KEYS.length]
-  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length
-  return key
-}
-
-function isRateLimitError(err: any): boolean {
-  const msg = err.message || ''
-  return msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests') || msg.includes('RESOURCE_EXHAUSTED')
-}
-
-// ── Generate content with automatic key rotation ──
-async function generateWithKeyRotation(prompt: string): Promise<{ text: string; keyUsed: number }> {
-  const totalKeys = API_KEYS.length
-  let lastError: any = null
-
-  for (let attempt = 0; attempt < totalKeys; attempt++) {
-    const key = getNextKey()
-    const keyIndex = (currentKeyIndex - 1 + totalKeys) % totalKeys
-    try {
-      const genAI = new GoogleGenerativeAI(key)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-      const result = await model.generateContent(prompt)
-      const text = result.response.text()
-      console.log(`✅ Generated response using key #${keyIndex + 1}/${totalKeys}`)
-      return { text, keyUsed: keyIndex }
-    } catch (err: any) {
-      lastError = err
-      if (isRateLimitError(err)) {
-        console.warn(`⚠️ Key #${keyIndex + 1} rate-limited, rotating to next key...`)
-        continue
+  // 1. Specific Metric Analysis
+  if (score !== undefined) {
+    if (msgLower.includes('why') || msgLower.includes('reason') || msgLower.includes('cause')) {
+      if (score < 50) {
+        return `The ${metric.toUpperCase()} score is critically low at ${score}%. This is likely due to upstream bottlenecks or recent operational failures. Immediate investigation into sub-component performance is recommended.`
+      } else if (score < 90) {
+        return `The ${metric.toUpperCase()} score is at warning level (${score}%). This indicates some inefficiencies. Check for minor delays or data inconsistencies.`
+      } else {
+        return `The ${metric.toUpperCase()} score is healthy at ${score}%. Operations are running smoothly.`
       }
-      throw err // non-rate-limit error, throw immediately
     }
-  }
-  throw lastError || new Error('All API keys exhausted')
-}
 
-// ── Stream content with automatic key rotation ──
-async function streamWithKeyRotation(
-  prompt: string,
-  onChunk: (text: string) => void
-): Promise<{ fullText: string; keyUsed: number }> {
-  const totalKeys = API_KEYS.length
-  let lastError: any = null
-
-  for (let attempt = 0; attempt < totalKeys; attempt++) {
-    const key = getNextKey()
-    const keyIndex = (currentKeyIndex - 1 + totalKeys) % totalKeys
-    try {
-      const genAI = new GoogleGenerativeAI(key)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-      const result = await model.generateContentStream(prompt)
-      let fullText = ''
-      for await (const chunk of result.stream) {
-        const text = chunk.text()
-        if (text) {
-          fullText += text
-          onChunk(text)
-        }
+    if (msgLower.includes('improve') || msgLower.includes('fix') || msgLower.includes('recommend')) {
+      if (score < 90) {
+        return `To improve ${metric.toUpperCase()}, focus on optimizing workflow efficiency and reducing error rates in the dependent processes.`
+      } else {
+        return `Current performance for ${metric.toUpperCase()} is optimal. Maintain current operational standards.`
       }
-      console.log(`✅ Streamed response using key #${keyIndex + 1}/${totalKeys}`)
-      return { fullText, keyUsed: keyIndex }
-    } catch (err: any) {
-      lastError = err
-      if (isRateLimitError(err)) {
-        console.warn(`⚠️ Key #${keyIndex + 1} rate-limited (stream), rotating to next key...`)
-        continue
-      }
-      throw err
     }
+
+    return `The current status of ${metric.toUpperCase()} is ${status} with a score of ${score}%.`
   }
-  throw lastError || new Error('All API keys exhausted')
+
+  // 2. General Queries
+  if (msgLower.includes('hello') || msgLower.includes('hi')) {
+    return "Hello! I am your Supply Chain Assistant. How can I help you with the metrics today?"
+  }
+
+  if (msgLower.includes('help')) {
+    return "I can help you analyze metric performance, identify root causes for low scores, and suggest improvements. Try asking about a specific metric like POI or OTD."
+  }
+
+  // Fallback
+  return `I can provide details on metric performance. Please select a specific node in the metric tree or ask about a specific metric.`
 }
 
-// ── POST /api/agent — Non-streaming AI response ──
+// ── POST /api/agent — Non-streaming Response ──
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { message, contextNode, contextData } = req.body
@@ -108,8 +56,7 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message is required' })
     }
 
-    const prompt = buildPrompt(message, contextNode, contextData)
-    const { text: agentResponse } = await generateWithKeyRotation(prompt)
+    const agentResponse = getRuleBasedResponse(message, contextNode, contextData)
 
     // Log interaction
     supabase
@@ -119,7 +66,7 @@ router.post('/', async (req: Request, res: Response) => {
         user_message: message,
         agent_response: agentResponse,
         context_node: contextNode || 'general',
-        tokens_used: Math.ceil((prompt.length + agentResponse.length) / 4)
+        tokens_used: 0 // No tokens used for rule-based
       })
       .then(({ error }) => {
         if (error) console.warn('Failed to log agent interaction:', error.message)
@@ -133,10 +80,7 @@ router.post('/', async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error('Agent API error:', error.message || error)
-    const userMsg = isRateLimitError(error)
-      ? 'All API keys are currently rate-limited. Please wait 1-2 minutes and try again.'
-      : error.message || 'Failed to process request'
-    res.status(500).json({ error: userMsg })
+    res.status(500).json({ error: 'Failed to process request' })
   }
 })
 
@@ -159,52 +103,7 @@ router.get('/history', async (req: Request, res: Response) => {
   }
 })
 
-// ── Prompt builder ──
-function buildPrompt(message: string, contextNode?: string, contextData?: any): string {
-  const systemPrompt = `You are an expert Supply Chain Analyst AI for "Nexen", a logistics dashboard.
-Your goal is to analyze metric tree data and provide actionable operational insights.
-Be concise, professional, and focus on root cause analysis.
-If a metric is Critical (<50%) or Warning (<90%), explain WHY based on the data hierarchy.
-
-Hierarchy:
-POI (Perfect Order Index) depends on:
-  - OTD (On-Time Delivery)
-  - OA (Order Accuracy)
-  - DFR (Damage Free Rate)
-
-OTD depends on:
-  - WPT (Warehouse Processing Time)
-  - Transit Time
-
-WPT depends on:
-  - Picking Time
-  - Label Generation
-  - Packing Speed`
-
-  const contextInfo = contextData ? `
-Current Context:
-- Metric: ${contextData.metric || contextNode}
-- Score: ${contextData.score}%
-- Status: ${contextData.status}
-- Warehouse: ${contextData.warehouseId}
-${contextData.errorCode ? `- Error Code: ${contextData.errorCode}` : ''}
-${contextData.avgTime ? `- Avg Time: ${contextData.avgTime}` : ''}
-${contextData.impactWeight ? `- Impact Weight: ${(contextData.impactWeight * 100).toFixed(0)}%` : ''}
-` : ''
-
-  return `${systemPrompt}
-
-${contextInfo}
-
-User Question: ${message}
-
-Provide:
-1. Analysis of the situation
-2. Root cause (if identifiable)
-3. 2-3 specific recommendations`
-}
-
-// ── POST /api/agent/chat — Streaming AI Chat via SSE with key rotation ──
+// ── POST /api/agent/chat — Mock Streaming Response ──
 router.post('/chat', async (req: Request, res: Response) => {
   try {
     const { message, contextNode, contextData } = req.body
@@ -213,7 +112,7 @@ router.post('/chat', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message is required' })
     }
 
-    const prompt = buildPrompt(message, contextNode, contextData)
+    const fullResponse = getRuleBasedResponse(message, contextNode, contextData)
 
     // Set SSE headers
     res.writeHead(200, {
@@ -223,36 +122,13 @@ router.post('/chat', async (req: Request, res: Response) => {
       'X-Accel-Buffering': 'no',
     })
 
-    let fullResponse = ''
-
-    try {
-      // Stream with automatic key rotation
-      const { fullText } = await streamWithKeyRotation(prompt, (chunkText) => {
-        res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunkText })}\n\n`)
-      })
-      fullResponse = fullText
-    } catch (streamError: any) {
-      console.error('All streaming keys failed, trying non-streaming:', streamError.message)
-      // Fallback: non-streaming with key rotation
-      try {
-        const { text } = await generateWithKeyRotation(prompt)
-        fullResponse = text
-        res.write(`data: ${JSON.stringify({ type: 'chunk', content: fullResponse })}\n\n`)
-      } catch (fallbackError: any) {
-        console.error('All generation attempts failed:', fallbackError.message)
-        const userMessage = isRateLimitError(fallbackError)
-          ? '⏳ All API keys are currently rate-limited. Please wait 1-2 minutes and try again.'
-          : `AI generation failed: ${fallbackError.message || 'Unknown error'}`
-        res.write(`data: ${JSON.stringify({ type: 'error', content: userMessage })}\n\n`)
-        res.end()
-        return
-      }
-    }
+    // Simulate streaming by sending the whole response in one or two chunks
+    res.write(`data: ${JSON.stringify({ type: 'chunk', content: fullResponse })}\n\n`)
 
     // Send completion event
     res.write(`data: ${JSON.stringify({ type: 'done', content: fullResponse })}\n\n`)
 
-    // Log interaction (non-blocking)
+    // Log interaction
     supabase
       .from('agent_logs')
       .insert({
@@ -260,7 +136,7 @@ router.post('/chat', async (req: Request, res: Response) => {
         user_message: message,
         agent_response: fullResponse,
         context_node: contextNode || 'chatbot',
-        tokens_used: Math.ceil((prompt.length + fullResponse.length) / 4)
+        tokens_used: 0
       })
       .then(({ error }) => {
         if (error) console.warn('Failed to log chat interaction:', error.message)
@@ -268,12 +144,9 @@ router.post('/chat', async (req: Request, res: Response) => {
 
     res.end()
   } catch (error: any) {
-    console.error('Streaming chat error:', error.message || error)
+    console.error('Chat error:', error.message || error)
     if (res.headersSent) {
-      const userMessage = isRateLimitError(error)
-        ? '⏳ All API keys are currently rate-limited. Please wait 1-2 minutes and try again.'
-        : `Error: ${error.message || 'An error occurred during generation.'}`
-      res.write(`data: ${JSON.stringify({ type: 'error', content: userMessage })}\n\n`)
+      res.write(`data: ${JSON.stringify({ type: 'error', content: 'An error occurred.' })}\n\n`)
       res.end()
     } else {
       res.status(500).json({ error: 'Failed to process chat request' })

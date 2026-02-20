@@ -87,7 +87,7 @@ router.post('/warehouse-setup', async (req: Request, res: Response) => {
         if (whError) return res.status(500).json({ error: `Warehouse Error: ${whError.message}` })
 
         // 2. Process Metrics (Calculate Rolling Avg & Predicted Score)
-        const { metric_id, staff_count, hours_of_day, day_of_week } = metrics
+        const { metric_id, staff_count, hours_of_day, day_of_week, order_volume } = metrics
 
         // Fetch last 7 days of snapshots for rolling avg
         const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -107,15 +107,51 @@ router.post('/warehouse-setup', async (req: Request, res: Response) => {
 
         const rolling_7d_avg = scores.length > 0 ? +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : 0
 
-        // Calculate Predicted Score
-        const staffFactor = Math.min(staff_count / 50, 1.2)
-        const isPeakHour = hours_of_day >= 9 && hours_of_day <= 18
-        const hourFactor = isPeakHour ? 1.1 : 0.9
-        const isWeekday = day_of_week >= 1 && day_of_week <= 5
-        const dayFactor = isWeekday ? 1.0 : 0.85
+        // Calculate Prediction via ML Engine (score.py)
+        let predicted_score = 0
+        let status = 'active'
 
-        const predicted_score = +(Math.min(rolling_7d_avg * staffFactor * hourFactor * dayFactor, 100)).toFixed(2)
-        const status = predicted_score >= 80 ? 'healthy' : predicted_score >= 60 ? 'warn' : 'critical'
+        try {
+            const mlRes = await fetch('http://localhost:5001/api/calculate-score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    metric_id,
+                    rolling_avg_7d: rolling_7d_avg,
+                    staff_count,
+                    hour_of_day: hours_of_day,
+                    day_of_week,
+                    orders_volume: order_volume
+                })
+            })
+
+            if (mlRes.ok) {
+                const mlData: any = await mlRes.json()
+                predicted_score = mlData.score
+            } else {
+                console.warn('ML Engine calculation failed, falling back to heuristic')
+                // Fallback if ML fails
+                const staffFactor = Math.min(staff_count / 50, 1.2)
+                const isPeakHour = hours_of_day >= 9 && hours_of_day <= 18
+                const hourFactor = isPeakHour ? 1.1 : 0.9
+                const isWeekday = day_of_week >= 1 && day_of_week <= 5
+                const dayFactor = isWeekday ? 1.0 : 0.85
+                const volumeFactor = order_volume ? Math.min(Math.max(1 - ((order_volume - 1000) / 5000), 0.8), 1.1) : 1.0
+                predicted_score = +(Math.min(rolling_7d_avg * staffFactor * hourFactor * dayFactor * volumeFactor, 100)).toFixed(2)
+            }
+        } catch (err) {
+            console.error('Error calling ML Engine:', err)
+            // Fallback
+            const staffFactor = Math.min(staff_count / 50, 1.2)
+            const isPeakHour = hours_of_day >= 9 && hours_of_day <= 18
+            const hourFactor = isPeakHour ? 1.1 : 0.9
+            const isWeekday = day_of_week >= 1 && day_of_week <= 5
+            const dayFactor = isWeekday ? 1.0 : 0.85
+            const volumeFactor = order_volume ? Math.min(Math.max(1 - ((order_volume - 1000) / 5000), 0.8), 1.1) : 1.0
+            predicted_score = +(Math.min(rolling_7d_avg * staffFactor * hourFactor * dayFactor * volumeFactor, 100)).toFixed(2)
+        }
+
+        status = predicted_score >= 80 ? 'healthy' : predicted_score >= 60 ? 'warn' : 'critical'
 
         // 3. Create New Snapshot with Predicted Data
         // We'll create a basic metric tree where the selected metric uses the predicted score

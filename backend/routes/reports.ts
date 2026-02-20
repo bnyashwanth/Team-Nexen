@@ -240,27 +240,20 @@ router.get('/download/:warehouseId', async (req: Request, res: Response) => {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    // Get AI summary if Gemini is configured
+    // Get Summary (Rule-based)
     let aiSummary = ''
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const { GoogleGenerativeAI } = require('@google/generative-ai')
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-        const latestSnapshot = snapshots?.[0]
-        const metricTree = latestSnapshot?.metric_tree || {}
-        const summaryPrompt = `You are a supply chain analyst. Write a concise 3-4 sentence executive summary for a warehouse performance report.
-Warehouse: ${warehouse.name} (${warehouse.zone} zone, ${warehouse.city})
-Period: Last ${days} days
-Latest metrics: ${JSON.stringify(metricTree)}
-Active alerts: ${alerts?.length || 0}
-Focus on key performance indicators and actionable insights. Be professional and concise.`
-        const result = await model.generateContent(summaryPrompt)
-        aiSummary = result.response.text()
-      } catch (err) {
-        console.warn('AI summary generation failed:', err)
-        aiSummary = 'AI summary unavailable.'
-      }
+    try {
+      const latestSnapshot = snapshots?.[0]
+      const metricTree = latestSnapshot?.metric_tree || {}
+
+      const score = metricTree?.poi?.score ?? 0
+      const status = metricTree?.poi?.status ?? 'unknown'
+      const alertCount = alerts?.length || 0
+
+      aiSummary = `Executive Summary: The warehouse ${warehouse.name} is currently operating with a ${status} status. The overall Perfect Order Index (POI) is ${score.toFixed(1)}%. There are currently ${alertCount} active alerts requiring attention. ${score < 90 ? 'Immediate action is recommended to resolve pending alerts and improve operational efficiency.' : 'Performance is stable.'}`
+    } catch (err) {
+      console.warn('Summary generation failed:', err)
+      aiSummary = 'Summary unavailable.'
     }
 
     // Generate PDF
