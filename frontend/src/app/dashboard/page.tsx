@@ -173,14 +173,10 @@ function Sidebar({
           <select
             value={selectedWarehouse}
             onChange={(e) => onWarehouseChange(e.target.value)}
-            className="mt-1.5 w-full text-sm rounded-lg px-3 py-2 transition-all outline-none"
-            style={{
-              background: 'rgba(15, 23, 42, 0.6)',
-              border: '1px solid var(--border-medium)',
-              color: 'var(--text-primary)',
-            }}>
+            className="mt-1.5 w-full text-sm rounded-lg px-3 py-2 transition-all outline-none bg-white border border-gray-200 text-gray-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          >
             {warehouses.map((w) => (
-              <option key={w.id || w._id} value={w.id || w._id} style={{ background: '#1e293b' }}>
+              <option key={w.id || w._id} value={w.id || w._id}>
                 {w.name} ({w.zone})
               </option>
             ))}
@@ -261,11 +257,10 @@ function DashboardCard({ icon, title, value, subtitle, status, color, onClick, d
           </div>
         </div>
         {status && (
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            status === 'healthy' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-            status === 'warn' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-            'bg-red-50 text-red-600 border border-red-200'
-          }`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status === 'healthy' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+              status === 'warn' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+                'bg-red-50 text-red-600 border border-red-200'
+            }`}>
             {status === 'healthy' ? 'Healthy' : status === 'warn' ? 'Warning' : 'Critical'}
           </span>
         )}
@@ -333,30 +328,28 @@ function AlertsView({ alerts }: { alerts: Alert[] }) {
             style={{
               background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
               borderColor: alert.status === 'critical' ? 'rgba(220, 38, 38, 0.2)' :
-                         alert.status === 'warn' ? 'rgba(217, 119, 6, 0.2)' :
-                         'rgba(16, 185, 129, 0.2)',
+                alert.status === 'warn' ? 'rgba(217, 119, 6, 0.2)' :
+                  'rgba(16, 185, 129, 0.2)',
               boxShadow: '0 2px 8px rgba(100, 116, 139, 0.05)',
             }}
           >
             <div className="flex items-start gap-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shrink-0 ${
-                alert.status === 'critical' ? 'bg-linear-to-br from-red-500 to-red-600' :
-                alert.status === 'warn' ? 'bg-linear-to-br from-amber-500 to-amber-600' :
-                'bg-linear-to-br from-emerald-500 to-emerald-600'
-              }`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shrink-0 ${alert.status === 'critical' ? 'bg-linear-to-br from-red-500 to-red-600' :
+                  alert.status === 'warn' ? 'bg-linear-to-br from-amber-500 to-amber-600' :
+                    'bg-linear-to-br from-emerald-500 to-emerald-600'
+                }`}>
                 {alert.status === 'critical' ? '⚠️' :
-                 alert.status === 'warn' ? '⚡' : '✓'}
+                  alert.status === 'warn' ? '⚡' : '✓'}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
                     {alert.title}
                   </h4>
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${
-                    alert.status === 'critical' ? 'bg-red-50 text-red-600 border-red-200' :
-                    alert.status === 'warn' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                    'bg-emerald-50 text-emerald-600 border-emerald-200'
-                  }`}>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${alert.status === 'critical' ? 'bg-red-50 text-red-600 border-red-200' :
+                      alert.status === 'warn' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                        'bg-emerald-50 text-emerald-600 border-emerald-200'
+                    }`}>
                     {alert.status.toUpperCase()}
                   </span>
                 </div>

@@ -156,14 +156,86 @@ router.post('/warehouse-setup', async (req: Request, res: Response) => {
         // 3. Create New Snapshot with Predicted Data
         // We'll create a basic metric tree where the selected metric uses the predicted score
         // For other metrics, we'll default to 0 or carry over if we had full tree logic (simplified here)
+        // 3. Create New Snapshot with Full Metric Tree
+        // Generate a realistic tree based on the predicted POI score
+        const baseScore = predicted_score
+
+        // Helper to generate a score close to a target with some variance
+        const vary = (base: number, variance: number = 5) => {
+            const val = base + (Math.random() * variance * 2 - variance)
+            return Math.min(Math.max(val, 0), 100)
+        }
+
+        const getStatus = (s: number) => s >= 80 ? 'healthy' : s >= 60 ? 'warn' : 'critical'
+
+        // Generate node data
+        const poiScore = baseScore
+        const otdScore = vary(poiScore, 5) // On-time delivery correlated with POI
+        const oaScore = vary(95, 3)        // Order accuracy usually high
+        const dfrScore = vary(98, 2)       // Damage free rate usually high
+
+        const wptScore = vary(otdScore, 5) // Warehouse processing affects OTD
+        const ttScore = vary(otdScore, 5)  // Transit time affects OTD
+
+        const pickScore = vary(wptScore, 5)
+        const labelScore = vary(wptScore, 3)
+        const packScore = vary(wptScore, 5)
+
         const metricTree: any = {
-            [metric_id]: {
-                name: metric_id.toUpperCase(), // Simplification
-                score: predicted_score,
-                status
+            poi: {
+                name: 'Perfect Order Index',
+                score: poiScore,
+                status: getStatus(poiScore),
+                impactWeight: 1.0
             },
-            // Root score logic simplified to just this metric for now as per user request scope
-            poi: { score: predicted_score, status, name: 'Perfect Order Index' }
+            otd: {
+                name: 'On-Time Delivery',
+                score: otdScore,
+                status: getStatus(otdScore),
+                impactWeight: 0.5
+            },
+            oa: {
+                name: 'Order Accuracy',
+                score: oaScore,
+                status: getStatus(oaScore),
+                impactWeight: 0.3
+            },
+            dfr: {
+                name: 'Damage Free Rate',
+                score: dfrScore,
+                status: getStatus(dfrScore),
+                impactWeight: 0.2
+            },
+            wpt: {
+                name: 'Warehouse Proc. Time',
+                score: wptScore,
+                status: getStatus(wptScore),
+                impactWeight: 0.6
+            },
+            tt: {
+                name: 'Transit Time',
+                score: ttScore,
+                status: getStatus(ttScore),
+                impactWeight: 0.4
+            },
+            pick: {
+                name: 'Picking Efficiency',
+                score: pickScore,
+                status: getStatus(pickScore),
+                impactWeight: 0.4
+            },
+            label: {
+                name: 'Label Gen. Time',
+                score: labelScore,
+                status: getStatus(labelScore),
+                impactWeight: 0.2
+            },
+            pack: {
+                name: 'Packing Efficiency',
+                score: packScore,
+                status: getStatus(packScore),
+                impactWeight: 0.4
+            }
         }
 
         await supabase.from('metric_snapshots').insert({

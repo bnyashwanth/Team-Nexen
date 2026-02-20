@@ -157,27 +157,38 @@ router.post('/', async (req: Request, res: Response) => {
         await supabase.from('metric_snapshots').delete().eq('warehouse_id', 'wh_002')
         await supabase.from('metric_snapshots').delete().eq('warehouse_id', 'wh_003')
 
-        const healthySnapshot = (whId: string) => ({
-            warehouse_id: whId,
-            timestamp: now.toISOString(),
-            root_score: 91,
-            root_status: 'healthy',
-            metric_tree: {
-                poi: { score: 91, status: 'healthy', name: 'Perfect Order Index' },
-                otd: { score: 93, status: 'healthy', name: 'On-Time Delivery', impactWeight: 0.60 },
-                oa: { score: 97, status: 'healthy', name: 'Order Accuracy', impactWeight: 0.25 },
-                dfr: { score: 99, status: 'healthy', name: 'Damage Free Rate', impactWeight: 0.15 },
-                wpt: { score: 90, status: 'healthy', name: 'Warehouse Processing', impactWeight: 0.55 },
-                tt: { score: 96, status: 'healthy', name: 'Transit Time', impactWeight: 0.45 },
-                pick: { score: 94, status: 'healthy', name: 'Picking Time', impactWeight: 0.30 },
-                pack: { score: 92, status: 'healthy', name: 'Packing Speed', impactWeight: 0.30 },
-                label: { score: 88, status: 'healthy', name: 'Label Generation', impactWeight: 0.40 }
-            }
-        })
+        // Helper to create healthy snapshots with custom variance
+        const healthySnapshot = (whId: string, targetScore: number) => {
+            // Slight randomness around target
+            const vary = (base: number) => Math.min(Math.max(base + (Math.random() * 4 - 2), 0), 100)
+            const poi = vary(targetScore)
 
-        await supabase.from('metric_snapshots').insert(healthySnapshot('wh_002'))
-        await supabase.from('metric_snapshots').insert(healthySnapshot('wh_003'))
-        console.log('✅ Created snapshots for all warehouses')
+            return {
+                warehouse_id: whId,
+                timestamp: now.toISOString(),
+                root_score: parseFloat(poi.toFixed(1)),
+                root_status: 'healthy',
+                metric_tree: {
+                    poi: { score: parseFloat(poi.toFixed(1)), status: 'healthy', name: 'Perfect Order Index' },
+                    otd: { score: parseFloat(vary(poi + 2).toFixed(1)), status: 'healthy', name: 'On-Time Delivery', impactWeight: 0.60 },
+                    oa: { score: parseFloat(vary(98).toFixed(1)), status: 'healthy', name: 'Order Accuracy', impactWeight: 0.25 },
+                    dfr: { score: parseFloat(vary(99).toFixed(1)), status: 'healthy', name: 'Damage Free Rate', impactWeight: 0.15 },
+                    wpt: { score: parseFloat(vary(poi - 1).toFixed(1)), status: 'healthy', name: 'Warehouse Processing', impactWeight: 0.55 },
+                    tt: { score: parseFloat(vary(95).toFixed(1)), status: 'healthy', name: 'Transit Time', impactWeight: 0.45 },
+                    pick: { score: parseFloat(vary(94).toFixed(1)), status: 'healthy', name: 'Picking Time', impactWeight: 0.30 },
+                    pack: { score: parseFloat(vary(92).toFixed(1)), status: 'healthy', name: 'Packing Speed', impactWeight: 0.30 },
+                    label: { score: parseFloat(vary(96).toFixed(1)), status: 'healthy', name: 'Label Generation', impactWeight: 0.40 }
+                }
+            }
+        }
+
+        // Delhi (wh_002) - High performer
+        await supabase.from('metric_snapshots').insert(healthySnapshot('wh_002', 94.5))
+
+        // Mumbai (wh_003) - Good but slightly lower
+        await supabase.from('metric_snapshots').insert(healthySnapshot('wh_003', 89.2))
+
+        console.log('✅ Created distinct snapshots for all warehouses')
 
         // ──────────────────────────────────────
         // 5. Create Critical Alert (label drop)

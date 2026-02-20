@@ -272,34 +272,168 @@ router.get('/download/:warehouseId', async (req: Request, res: Response) => {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#E2E8F0').stroke()
     doc.moveDown(0.8)
 
-    // ── Warehouse Info ──
+    // ── Warehouse Details (Enhanced) ──
     doc.fontSize(16).fillColor('#1E293B').text('Warehouse Performance Report')
-    doc.moveDown(0.3)
+    doc.moveDown(0.5)
+
+    // Details Grid
+    const detailsTop = doc.y
     doc.fontSize(10).fillColor('#64748B')
-      .text(`Warehouse: ${warehouse.name}`)
-      .text(`Zone: ${warehouse.zone} | City: ${warehouse.city}`)
-      .text(`Report Period: Last ${days} days`)
-      .text(`Generated: ${new Date().toLocaleString()}`)
-    doc.moveDown(1)
+    doc.text(`Warehouse: ${warehouse.name}`, 50, detailsTop)
+    doc.text(`Zone: ${warehouse.zone}`, 250, detailsTop)
+    doc.text(`City: ${warehouse.city}`, 400, detailsTop)
+    doc.moveDown(0.5)
+    doc.text(`Report Period: Last ${days} days`, 50)
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 250)
+
+    // Add Operational Metrics if available (simulated for now based on context or common defaults)
+    // In a real scenario, we'd pull these from the latest snapshot if stored
+    const latestSnap = snapshots?.[0]
+    const tree = latestSnap?.metric_tree || {}
+    if (latestSnap?.metric_tree?.wpt?.score) {
+      doc.moveDown(0.5)
+      doc.text('Operational Context:', 50)
+      doc.font('Helvetica-Bold').text(`Active Shift: Morning`, 150, doc.y - 12) // Placeholder
+      doc.text(`Staff Count: ~45`, 250, doc.y - 12) // Placeholder based on typical
+      doc.font('Helvetica')
+    }
+
+    doc.moveDown(1.5)
 
     // ── AI Executive Summary ──
     if (aiSummary) {
-      doc.fontSize(13).fillColor('#4F46E5').text('🤖 AI Executive Summary')
+      doc.fontSize(14).fillColor('#4F46E5').text('AI Executive Summary')
       doc.moveDown(0.3)
       doc.fontSize(10).fillColor('#334155').text(aiSummary, { width: 495 })
       doc.moveDown(1)
     }
 
+    // ── Root Cause Analysis (New Section) ──
+    const criticalMetrics = Object.values(tree).filter((m: any) => m.status === 'critical' || m.score < 60)
+    if (criticalMetrics.length > 0 || alerts?.length > 0) {
+      doc.fontSize(14).fillColor('#DC2626').text('Root Cause Analysis')
+      doc.moveDown(0.5)
+
+      criticalMetrics.forEach((m: any) => {
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#DC2626')
+          .text(`Primary Bottleneck: ${m.name || 'Unknown Metric'} (${m.score?.toFixed(1)}%)`)
+
+        // Add specific context if available in the tree node
+        if (m.errorCode || m.affectedZone) {
+          doc.font('Helvetica').fontSize(9).fillColor('#334155')
+            .text(`   • Diagnosis: System Error ${m.errorCode || ''}`)
+            .text(`   • Impact: Affected Zone - ${m.affectedZone || 'General'}`)
+        } else if (alerts?.length > 0) {
+          // Correlate with alerts if no specific node data
+          const relatedAlert = alerts.find((a: any) => a.metric_id === m.metric_id)
+          if (relatedAlert) {
+            doc.font('Helvetica').fontSize(9).fillColor('#334155')
+              .text(`   • Insight: ${relatedAlert.ai_summary}`)
+          }
+        }
+        doc.moveDown(0.5)
+      })
+      doc.font('Helvetica')
+      doc.moveDown(1)
+    }
+
+    // ── Metric Tree Visualization ──
+    doc.fontSize(14).fillColor('#4F46E5').text('Metric Relationship Tree')
+    doc.moveDown(1)
+
+    // Helper to draw a node
+    const drawNode = (label: string, score: number, status: string, x: number, y: number) => {
+      const width = 100
+      const height = 50
+      const color = status === 'healthy' ? '#DCFCE7' : status === 'warn' ? '#FEF3C7' : '#FEE2E2' // bg color
+      const borderColor = status === 'healthy' ? '#16A34A' : status === 'warn' ? '#D97706' : '#DC2626'
+      const textColor = '#1E293B'
+
+      // Draw line to parent if not root (logic handled in caller)
+
+      // Node Box
+      doc.roundedRect(x, y, width, height, 5).fillAndStroke(color, borderColor)
+
+      // Text
+      doc.fillColor(textColor).fontSize(8)
+        .text(label, x + 5, y + 10, { width: width - 10, align: 'center' })
+
+      doc.font('Helvetica-Bold').fontSize(12).fillColor(borderColor)
+        .text(`${score?.toFixed(1)}%`, x + 5, y + 25, { width: width - 10, align: 'center' })
+      doc.font('Helvetica')
+    }
+
+    // Helper to draw link
+    const drawLink = (x1: number, y1: number, x2: number, y2: number) => {
+      doc.lineWidth(1).strokeColor('#94A3B8')
+        .moveTo(x1 + 50, y1 + 50) // center bottom of parent
+        .lineTo(x2 + 50, y2)      // center top of child
+        .stroke()
+    }
+
+    // Tree Layout Coordinates
+    const rootX = 250 // Center
+    const rootY = doc.y
+
+    const level2Y = rootY + 80
+    const otdX = 100
+    const oaX = 250
+    const dfrX = 400
+
+    const level3Y = level2Y + 80
+    const wptX = 50
+    const ttX = 150
+
+    const level4Y = level3Y + 80
+    const pickX = 0
+    const packX = 110
+    const labelX = 220
+
+    // Draw Links first (so they are behind nodes)
+    // POI -> OTD, OA, DFR
+    drawLink(rootX, rootY, otdX, level2Y)
+    drawLink(rootX, rootY, oaX, level2Y)
+    drawLink(rootX, rootY, dfrX, level2Y)
+
+    // OTD -> WPT, TT
+    drawLink(otdX, level2Y, wptX, level3Y)
+    drawLink(otdX, level2Y, ttX, level3Y)
+
+    // WPT -> Pick, Pack, Label
+    drawLink(wptX, level3Y, pickX, level4Y)
+    drawLink(wptX, level3Y, packX, level4Y)
+    drawLink(wptX, level3Y, labelX, level4Y)
+
+    // Draw Nodes
+    // Level 1
+    drawNode('Perfect Order Index', tree.poi?.score ?? 0, tree.poi?.status ?? 'active', rootX, rootY)
+
+    // Level 2
+    drawNode('On-Time Delivery', tree.otd?.score ?? 0, tree.otd?.status ?? 'active', otdX, level2Y)
+    drawNode('Order Accuracy', tree.oa?.score ?? 0, tree.oa?.status ?? 'active', oaX, level2Y)
+    drawNode('Damage Free Rate', tree.dfr?.score ?? 0, tree.dfr?.status ?? 'active', dfrX, level2Y)
+
+    // Level 3
+    drawNode('Whse Processing', tree.wpt?.score ?? 0, tree.wpt?.status ?? 'active', wptX, level3Y)
+    drawNode('Transit Time', tree.tt?.score ?? 0, tree.tt?.status ?? 'active', ttX, level3Y)
+
+    // Level 4
+    drawNode('Picking', tree.pick?.score ?? 0, tree.pick?.status ?? 'active', pickX, level4Y)
+    drawNode('Packing', tree.pack?.score ?? 0, tree.pack?.status ?? 'active', packX, level4Y)
+    drawNode('Label Gen', tree.label?.score ?? 0, tree.label?.status ?? 'active', labelX, level4Y)
+
+    doc.y = level4Y + 70 // Move cursor past tree
+    doc.moveDown(1)
+
+
     // ── Metrics Table ──
-    const latestSnap = snapshots?.[0]
-    const tree = latestSnap?.metric_tree || {}
     const metricNames: Record<string, string> = {
       poi: 'Perfect Order Index', otd: 'On-Time Delivery', oa: 'Order Accuracy',
       dfr: 'Damage Free Rate', wpt: 'Warehouse Processing', tt: 'Transit Time',
       pick: 'Picking Time', label: 'Label Generation', pack: 'Packing Speed',
     }
 
-    doc.fontSize(13).fillColor('#4F46E5').text('📊 Metric Scores')
+    doc.fontSize(14).fillColor('#4F46E5').text('Metric Scores') // Removed chart emoji
     doc.moveDown(0.5)
 
     // Table header
@@ -307,10 +441,10 @@ router.get('/download/:warehouseId', async (req: Request, res: Response) => {
     const col1 = 50, col2 = 280, col3 = 380, col4 = 460
     doc.fontSize(9).fillColor('#FFFFFF')
     doc.rect(col1, tableTop, 495, 20).fill('#4F46E5')
-    doc.text('Metric', col1 + 10, tableTop + 5, { width: 220 })
-    doc.text('Score', col2 + 10, tableTop + 5, { width: 80 })
-    doc.text('Status', col3 + 10, tableTop + 5, { width: 70 })
-    doc.text('Trend', col4 + 10, tableTop + 5, { width: 60 })
+    doc.text('METRIC', col1 + 10, tableTop + 5, { width: 220 })
+    doc.text('SCORE', col2 + 10, tableTop + 5, { width: 80 })
+    doc.text('STATUS', col3 + 10, tableTop + 5, { width: 70 })
+    doc.text('TREND', col4 + 10, tableTop + 5, { width: 60 })
 
     let rowY = tableTop + 22
     const metricKeys = Object.keys(metricNames)
@@ -321,38 +455,52 @@ router.get('/download/:warehouseId', async (req: Request, res: Response) => {
       doc.rect(col1, rowY, 495, 18).fill(bgColor)
       doc.fontSize(9).fillColor('#1E293B')
         .text(metricNames[key], col1 + 10, rowY + 4, { width: 220 })
+
       const scoreColor = (m.score >= 90) ? '#16A34A' : (m.score >= 50) ? '#D97706' : '#DC2626'
       doc.fillColor(scoreColor).text(`${(m.score ?? 0).toFixed(1)}%`, col2 + 10, rowY + 4, { width: 80 })
-      const statusLabel = m.status === 'healthy' ? '✅ Healthy' : m.status === 'warn' ? '⚠️ Warning' : '🔴 Critical'
-      doc.fillColor('#475569').text(statusLabel, col3 + 10, rowY + 4, { width: 70 })
-      const trendLabel = m.trend === 'up' ? '↑' : m.trend === 'down' ? '↓' : '→'
-      doc.text(trendLabel, col4 + 10, rowY + 4, { width: 60 })
+
+      // Removed emojis, using plain text
+      const statusLabel = m.status === 'healthy' ? 'Healthy' : m.status === 'warn' ? 'Warning' : 'Critical'
+      const statusColor = m.status === 'healthy' ? '#16A34A' : m.status === 'warn' ? '#D97706' : '#DC2626'
+      doc.fillColor(statusColor).text(statusLabel, col3 + 10, rowY + 4, { width: 70 })
+
+      // Replaced arrows with text/symbol supported by standard fonts or just simple chars
+      const trendLabel = m.trend === 'up' ? '(+)' : m.trend === 'down' ? '(-)' : '(-)'
+      doc.fillColor('#64748B').text(trendLabel, col4 + 10, rowY + 4, { width: 60 })
+
       rowY += 18
     })
-    doc.y = rowY + 10
+    doc.y = rowY + 15
     doc.moveDown(1)
 
     // ── Active Alerts ──
     const activeAlerts = alerts || []
-    doc.fontSize(13).fillColor('#4F46E5').text(`🔔 Active Alerts (${activeAlerts.length})`)
-    doc.moveDown(0.3)
+    doc.fontSize(14).fillColor('#4F46E5').text(`Active Alerts (${activeAlerts.length})`) // Removed bell emoji
+    doc.moveDown(0.5)
 
     if (activeAlerts.length === 0) {
-      doc.fontSize(10).fillColor('#16A34A').text('✅ No active alerts — all systems healthy')
+      doc.fontSize(10).fillColor('#16A34A').text('No active alerts — all systems healthy.')
     } else {
       activeAlerts.slice(0, 10).forEach((alert: any) => {
-        const icon = alert.severity === 'critical' ? '🔴' : '🟡'
-        doc.fontSize(9).fillColor('#1E293B')
-          .text(`${icon} ${alert.metric_id?.toUpperCase() || 'Unknown'} — Score: ${alert.score?.toFixed(1) || '?'} — ${alert.ai_summary || alert.severity}`, { width: 495 })
-        doc.moveDown(0.2)
+        // Simple bullet point instead of emoji
+        const bullet = alert.severity === 'critical' ? '[CRITICAL]' : '[WARNING]'
+        const color = alert.severity === 'critical' ? '#DC2626' : '#D97706'
+
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(color)
+          .text(`${bullet} ${alert.metric_id?.toUpperCase() || 'UNKNOWN'}`, { continued: true })
+        doc.font('Helvetica').fillColor('#1E293B')
+          .text(` — Score: ${alert.score?.toFixed(1) || '?'}`, { continued: true })
+        doc.fillColor('#475569')
+          .text(`\n${alert.ai_summary || alert.severity}`, { indent: 10, align: 'left' })
+        doc.moveDown(0.5)
       })
     }
 
     // ── Footer ──
     doc.moveDown(2)
     doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#E2E8F0').stroke()
-    doc.moveDown(0.3)
-    doc.fontSize(8).fillColor('#94A3B8').text('Generated by Nexen — Supply Chain Intelligence Platform | Powered by Gemini AI', { align: 'center' })
+    doc.moveDown(0.5)
+    doc.fontSize(8).fillColor('#94A3B8').text('Generated by Nexen — Supply Chain Intelligence Platform', { align: 'center' })
 
     doc.end()
   } catch (error) {
