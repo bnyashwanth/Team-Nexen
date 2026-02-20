@@ -30,43 +30,42 @@ def load_model(filename):
     return None
 
 
-# Load all available models at startup
-anomaly_model = load_model("Anomaly_model.pkl")
-z_score_model = load_model("z_model.pkl")
-root_cause_model = load_model("root_cause_model.pkl")
-poi_model = load_model("poi_model.pkl")
-poi_actual_model = load_model("model_poi_actual_score.pkl")
-wpt_model = load_model("model_wpt.pkl")
-otd_model = load_model("model_otd.pkl")
+# Global model cache
+MODEL_CACHE = {}
 
-print("=" * 50)
-print("ML Engine Model Status:")
-print(f"  Anomaly Detection  : {'[OK] Loaded' if anomaly_model else '[X] Not found'}")
-print(f"  Z-Score Regression : {'[OK] Loaded' if z_score_model else '[X] Not found'}")
-print(f"  Root Cause Classif.: {'[OK] Loaded' if root_cause_model else '[X] Not found'}")
-print(f"  POI Forecasting    : {'[OK] Loaded' if poi_model else '[X] Not found'}")
-print(f"  POI Actual Score   : {'[OK] Loaded' if poi_actual_model else '[X] Not found'}")
-print(f"  WPT Score          : {'[OK] Loaded' if wpt_model else '[X] Not found'}")
-print(f"  OTD Score          : {'[OK] Loaded' if otd_model else '[X] Not found'}")
-print("=" * 50)
-
+def get_model(model_name):
+    """Lazy load a model and cache it."""
+    if model_name in MODEL_CACHE:
+        return MODEL_CACHE[model_name]
+    
+    # Map friendly names to filenames
+    model_files = {
+        "anomaly": "Anomaly_model.pkl",
+        "z_score": "z_model.pkl",
+        "root_cause": "root_cause_model.pkl",
+        "poi": "poi_model.pkl",
+        "poi_actual": "model_poi_actual_score.pkl",
+        "wpt": "model_wpt.pkl",
+        "otd": "model_otd.pkl"
+    }
+    
+    filename = model_files.get(model_name)
+    if not filename:
+        return None
+        
+    model = load_model(filename)
+    MODEL_CACHE[model_name] = model
+    return model
 
 # =====================
 # HEALTH CHECK
 # =====================
 @app.route("/api/health", methods=["GET"])
 def health():
+    # Check what's currently loaded
     return jsonify({
         "status": "ok",
-        "models": {
-            "anomaly_detection": anomaly_model is not None,
-            "z_score": z_score_model is not None,
-            "root_cause": root_cause_model is not None,
-            "poi_forecast": poi_model is not None,
-            "poi_actual": poi_actual_model is not None,
-            "wpt_score": wpt_model is not None,
-            "otd_score": otd_model is not None,
-        }
+        "loaded_models": list(MODEL_CACHE.keys())
     })
 
 
@@ -106,6 +105,11 @@ def analyze():
         is_anomaly = False
         anomaly_confidence = 0.5
 
+        # Anomaly Detection
+        is_anomaly = False
+        anomaly_confidence = 0.5
+        
+        anomaly_model = get_model("anomaly")
         if anomaly_model:
             features = pd.DataFrame([{
                 "hour_of_day": data["hour_of_day"],
@@ -131,6 +135,7 @@ def analyze():
 
         # Z-Score Prediction
         z_score = 0.0
+        z_score_model = get_model("z_score")
         if z_score_model:
             z_features = pd.DataFrame([{
                 "hour_of_day": data["hour_of_day"],
@@ -190,6 +195,7 @@ def root_cause():
         recommendation = "No specific recommendation available."
         confidence = 0.5
 
+        root_cause_model = get_model("root_cause")
         if root_cause_model:
             import pandas as pd
 
@@ -258,6 +264,7 @@ def predict_poi():
     """Forecast tomorrow's POI score."""
     try:
         data = request.get_json()
+        poi_model = get_model("poi")
         if not poi_model:
             return jsonify({"error": "POI model not loaded"}), 503
 
@@ -289,6 +296,7 @@ def predict_poi_actual():
     """Predict POI actual score from sub-metric scores."""
     try:
         data = request.get_json()
+        poi_actual_model = get_model("poi_actual")
         if not poi_actual_model:
             return jsonify({"error": "POI Actual model not loaded"}), 503
 
@@ -314,6 +322,7 @@ def predict_wpt():
     """Predict WPT (Warehouse Processing Time) score."""
     try:
         data = request.get_json()
+        wpt_model = get_model("wpt")
         if not wpt_model:
             return jsonify({"error": "WPT model not loaded"}), 503
 
@@ -337,6 +346,7 @@ def predict_otd():
     """Predict OTD (On-Time Delivery) score."""
     try:
         data = request.get_json()
+        otd_model = get_model("otd")
         if not otd_model:
             return jsonify({"error": "OTD model not loaded"}), 503
 

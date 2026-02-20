@@ -10,132 +10,138 @@ from sklearn.impute import SimpleImputer
 import numpy as np
 
 # =====================
-# CREATE MODELS FOLDER
+# MAIN EXECUTION (TRAINING)
 # =====================
-os.makedirs("models", exist_ok=True)
+if __name__ == "__main__":
+    # =====================
+    # CREATE MODELS FOLDER
+    # =====================
+    os.makedirs("models", exist_ok=True)
 
-# =====================
-# LOAD DATA
-# =====================
-df_1 = pd.read_csv("data/dataset1_anomaly_detection.csv")
-df_1.columns = df_1.columns.str.lower().str.strip()
+    # =====================
+    # LOAD DATA
+    # =====================
+    df_1 = pd.read_csv("data/dataset1_anomaly_detection.csv")
+    df_1.columns = df_1.columns.str.lower().str.strip()
 
-# Convert timestamp to datetime if exists
-if 'timestamp' in df_1.columns:
-    df_1['timestamp'] = pd.to_datetime(df_1['timestamp'])
+    # Convert timestamp to datetime if exists
+    if 'timestamp' in df_1.columns:
+        df_1['timestamp'] = pd.to_datetime(df_1['timestamp'])
 
-# Calculate rolling 7-day average for orders_volume
-if 'orders_volume' in df_1.columns and 'timestamp' in df_1.columns:
-    df_1 = df_1.sort_values('timestamp')
-    # Calculate rolling average per warehouse
-    df_1['rolling_avg_7d'] = df_1.groupby('warehouse_id')['orders_volume'].transform(
-        lambda x: x.rolling(window=7, min_periods=1).mean()
-    )
-
-# Calculate composite score using formula
-# Score = (0.4 * normalized_orders_volume) + (0.3 * staff_efficiency) + (0.2 * rolling_avg_7d) + (0.1 * time_factor)
-if 'orders_volume' in df_1.columns:
-    # Normalize orders_volume (0-100 scale)
-    max_volume = df_1['orders_volume'].max()
-    df_1['normalized_volume'] = (df_1['orders_volume'] / max_volume * 100) if max_volume > 0 else 50
-    
-    # Calculate staff efficiency (assuming staff_count and orders_volume)
-    if 'staff_count' in df_1.columns and 'orders_volume' in df_1.columns:
-        # Avoid division by zero
-        df_1['staff_efficiency'] = (df_1['orders_volume'] / df_1['staff_count'].replace(0, 1)).clip(0, 100)
-    else:
-        df_1['staff_efficiency'] = 75  # Default efficiency
-    
-    # Calculate time factor (hour_of_day and day_of_week impact)
-    if 'hour_of_day' in df_1.columns:
-        # Peak hours: 9-17 get higher scores
-        df_1['time_factor'] = np.where(
-            (df_1['hour_of_day'] >= 9) & (df_1['hour_of_day'] <= 17),
-            80,  # Peak hours
-            40   # Off hours
+    # Calculate rolling 7-day average for orders_volume
+    if 'orders_volume' in df_1.columns and 'timestamp' in df_1.columns:
+        df_1 = df_1.sort_values('timestamp')
+        # Calculate rolling average per warehouse
+        df_1['rolling_avg_7d'] = df_1.groupby('warehouse_id')['orders_volume'].transform(
+            lambda x: x.rolling(window=7, min_periods=1).mean()
         )
-    else:
-        df_1['time_factor'] = 60  # Default time factor
-    
-    # Calculate final score using formula
+
+    # Calculate composite score using formula
+    # Score = (0.4 * normalized_orders_volume) + (0.3 * staff_efficiency) + (0.2 * rolling_avg_7d) + (0.1 * time_factor)
     if 'orders_volume' in df_1.columns:
+        # Normalize orders_volume (0-100 scale)
         max_volume = df_1['orders_volume'].max()
-        if max_volume > 0:
-            df_1['score'] = (
-                0.4 * df_1['normalized_volume'] +
-                0.3 * df_1['staff_efficiency'] +
-                0.2 * (df_1['rolling_avg_7d'] / max_volume * 100) +
-                0.1 * df_1['time_factor']
-            ).round(2)
+        df_1['normalized_volume'] = (df_1['orders_volume'] / max_volume * 100) if max_volume > 0 else 50
+        
+        # Calculate staff efficiency (assuming staff_count and orders_volume)
+        if 'staff_count' in df_1.columns and 'orders_volume' in df_1.columns:
+            # Avoid division by zero
+            df_1['staff_efficiency'] = (df_1['orders_volume'] / df_1['staff_count'].replace(0, 1)).clip(0, 100)
         else:
-            df_1['score'] = 75.0  # Default score if no valid data
+            df_1['staff_efficiency'] = 75  # Default efficiency
+        
+        # Calculate time factor (hour_of_day and day_of_week impact)
+        if 'hour_of_day' in df_1.columns:
+            # Peak hours: 9-17 get higher scores
+            df_1['time_factor'] = np.where(
+                (df_1['hour_of_day'] >= 9) & (df_1['hour_of_day'] <= 17),
+                80,  # Peak hours
+                40   # Off hours
+            )
+        else:
+            df_1['time_factor'] = 60  # Default time factor
+        
+        # Calculate final score using formula
+        if 'orders_volume' in df_1.columns:
+            max_volume = df_1['orders_volume'].max()
+            if max_volume > 0:
+                df_1['score'] = (
+                    0.4 * df_1['normalized_volume'] +
+                    0.3 * df_1['staff_efficiency'] +
+                    0.2 * (df_1['rolling_avg_7d'] / max_volume * 100) +
+                    0.1 * df_1['time_factor']
+                ).round(2)
+            else:
+                df_1['score'] = 75.0  # Default score if no valid data
+        else:
+            df_1['score'] = 75.0  # Default score
     else:
         df_1['score'] = 75.0  # Default score
 
-# =====================
-# DEFINE FEATURES
-# =====================
-num_features = [
-    "hour_of_day",
-    "day_of_week",
-    "orders_volume",
-    "staff_count",
-    "rolling_avg_7d"
-]
+    # =====================
+    # DEFINE FEATURES
+    # =====================
+    num_features = [
+        "hour_of_day",
+        "day_of_week",
+        "orders_volume",
+        "staff_count",
+        "rolling_avg_7d"
+    ]
 
-cat_features = [
-    "warehouse_id",
-    "metric_id"
-]
+    cat_features = [
+        "warehouse_id",
+        "metric_id"
+    ]
 
-target = "score"
+    target = "score"
 
-X = df_1[num_features + cat_features]
-y = df_1[target]
+    X = df_1[num_features + cat_features]
+    y = df_1[target]
 
-# =====================
-# CREATE PIPELINE
-# =====================
-num_pipe = Pipeline([
-    ("imputer", SimpleImputer(strategy="median")),
-    ("scaler", StandardScaler())
-])
+    # =====================
+    # CREATE PIPELINE
+    # =====================
+    num_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", StandardScaler())
+    ])
 
-cat_pipe = Pipeline([
-    ("imputer", SimpleImputer(strategy="most_frequent")),
-    ("encoder", OneHotEncoder(handle_unknown="ignore"))
-])
+    cat_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("encoder", OneHotEncoder(handle_unknown="ignore"))
+    ])
 
-preprocessor = ColumnTransformer([
-    ("num", num_pipe, num_features),
-    ("cat", cat_pipe, cat_features)
-])
+    preprocessor = ColumnTransformer([
+        ("num", num_pipe, num_features),
+        ("cat", cat_pipe, cat_features)
+    ])
 
-model_pipeline = Pipeline([
-    ("preprocessor", preprocessor),
-    ("model", RandomForestRegressor(
-        n_estimators=100,
-        random_state=42,
-        n_jobs=-1
-    ))
-])
+    model_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", RandomForestRegressor(
+            n_estimators=100,
+            random_state=42,
+            n_jobs=-1
+        ))
+    ])
 
-# =====================
-# TRAIN MODEL
-# =====================
-print("Training model...")
-model_pipeline.fit(X, y)
+    # =====================
+    # TRAIN MODEL
+    # =====================
+    print("Training model...")
+    model_pipeline.fit(X, y)
 
-# =====================
-# SAVE MODEL
-# =====================
-model_path = "models/score_model.pkl"
+    # =====================
+    # SAVE MODEL
+    # =====================
+    model_path = "models/score_model.pkl"
 
-with open(model_path, "wb") as f:
-    pickle.dump(model_pipeline, f)
+    with open(model_path, "wb") as f:
+        pickle.dump(model_pipeline, f)
 
-print("Model trained successfully")
-print("Model stored at:", model_path)
+    print("Model trained successfully")
+    print("Model stored at:", model_path)
 
 # =====================
 # SCORE CALCULATION FUNCTION
