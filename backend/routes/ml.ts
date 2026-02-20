@@ -3,25 +3,34 @@ import { supabase } from '../lib/supabase'
 
 const router = Router()
 
-const ML_ENGINE_URL = process.env.ML_ENGINE_URL || 'http://localhost:5001'
+const rawUrl = process.env.ML_ENGINE_URL || 'http://localhost:5001'
+const ML_ENGINE_URL = rawUrl.startsWith('http') ? rawUrl : `http://${rawUrl}`
 
 /**
  * Helper to proxy requests to the ML Flask API
  */
 async function proxyToML(endpoint: string, body: any): Promise<any> {
-    const response = await fetch(`${ML_ENGINE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
-    if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({ error: 'ML Engine error' })) as Record<string, unknown>
-        const err: Record<string, unknown> = { status: response.status, ...errorBody }
-        throw err
+    try {
+        const response = await fetch(`${ML_ENGINE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        })
+
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({ error: 'ML Engine error' })) as Record<string, unknown>
+            const err: Record<string, unknown> = { status: response.status, ...errorBody }
+            throw err
+        }
+
+        return await response.json()
+    } finally {
+        clearTimeout(timeout)
     }
-
-    return response.json()
 }
 
 /**
@@ -29,16 +38,20 @@ async function proxyToML(endpoint: string, body: any): Promise<any> {
  * Check ML engine health and model status
  */
 router.get('/health', async (req: Request, res: Response) => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000) // 3s timeout for health check
+
     try {
         const response = await fetch(`${ML_ENGINE_URL}/api/health`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal
         })
 
         if (!response.ok) {
             return res.status(503).json({
                 status: 'unreachable',
-                error: 'ML Engine is not responding',
+                error: `ML Engine responded with status ${response.status}`,
                 ml_engine_url: ML_ENGINE_URL,
             })
         }
@@ -50,11 +63,16 @@ router.get('/health', async (req: Request, res: Response) => {
             ml_engine_url: ML_ENGINE_URL,
         })
     } catch (error: any) {
+        let msg = error.message || 'ML Engine is not running'
+        if (error.name === 'AbortError') msg = 'Connection timeout'
+
         res.status(503).json({
             status: 'unreachable',
-            error: error.message || 'ML Engine is not running',
+            error: msg,
             ml_engine_url: ML_ENGINE_URL,
         })
+    } finally {
+        clearTimeout(timeout)
     }
 })
 
