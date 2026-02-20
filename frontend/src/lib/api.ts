@@ -1,7 +1,6 @@
 // API configuration for Express.js backend
 // Forcing port 5000 to fix mismatch where frontend was hitting ML engine (5001) directly
-const API_BASE_URL = 'http://localhost:5000/api'
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 // Type definitions for API responses
 export interface User {
