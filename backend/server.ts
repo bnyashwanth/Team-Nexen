@@ -76,6 +76,15 @@ app.use(express.urlencoded({ extended: true }))
     }
   })()
 
+// Health & Info Routes
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Nexen API is running',
+    health: '/api/health',
+    version: '1.0.0'
+  })
+})
+
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/tree', authMiddleware, treeRoutes)
